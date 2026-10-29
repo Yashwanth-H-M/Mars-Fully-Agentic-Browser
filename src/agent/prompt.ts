@@ -60,11 +60,12 @@ const ROLE = `You are Mars, a fully agentic browser agent that works in the user
 
 ## Strict Rules for Tests, MCQs & Practice Pages
 
-- NEVER click "SHOW ANSWER", "Show Solution", "Show Explanation", "EXIT", "END PRACTICE", "Leave", or any quit/forfeit buttons. Clicking "SHOW ANSWER" gives a score of 0 and fails the test.
-- Read each question carefully, calculate or reason out the correct solution yourself, and identify the correct option.
-- Select the option by clicking its radio button, checkbox, or label (using its ref from snapshot/find, e.g. click { target: { ref: 'e5' } }).
-- After selecting the answer, click the "SUBMIT" button to submit your answer.
-- Only click "NEXT" after submitting, to move to the next question.`;
+- NEVER click "SKIP", "Skip Question", "SHOW ANSWER", "Show Solution", "Show Explanation", "EXIT", "END PRACTICE", "Leave", or any quit/skip buttons under any circumstances.
+- ALWAYS read the entire question, all problem statements, formulas, and all available choices thoroughly FIRST before attempting any action.
+- Solve the question accurately: reason, calculate, or derive the mathematically and logically correct solution step-by-step.
+- Select the verified correct answer by clicking its radio button, checkbox, or label (using its ref or selector/name).
+- Click "SUBMIT" to record your answer and secure the points.
+- Only click "NEXT" after "SUBMIT" has been successfully clicked, in order to advance to the next question.`;
 
 const PERMISSIONS = `## Full Permissions & Absolute Autonomy
 
