@@ -42,7 +42,7 @@ export interface Settings {
 export const DEFAULT_SETTINGS: Settings = {
   defaultMode: 'ask',
   defaultModel: null,
-  reasoning: 'medium',
+  reasoning: 'none',
   turnCap: 100,
   customInstructions: '',
   theme: 'system',
