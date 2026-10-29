@@ -24,7 +24,7 @@ export interface ResolvedTarget {
   /** For receipts and prompts: 'button "Delete" in row "INV-1042 Acme Corp Delete"'. */
   description: string;
   /** How the target was named, for the receipt. */
-  via: 'ref' | 'semantic';
+  via: 'ref' | 'semantic' | 'selector' | 'point';
 }
 
 function walk(nodes: ONode[], visit: (n: ONode, ancestors: ONode[]) => void, ancestors: ONode[] = []): void {
@@ -117,6 +117,74 @@ export function describeTarget(ctx: ToolContext, record: RefRecord): string {
  * Revalidation: the ref is known and was shown; its frame still has the same document; the node still resolves; and
  * Chrome's accessibility tree still gives it the role and name the agent was shown.
  */
+async function resolveSelector(ctx: ToolContext, selector: string): Promise<RefRecord> {
+  const tab = ctx.tab();
+  const attachment = await ctx.attach();
+  const frames = await attachment.topology.frames();
+  for (const frame of frames) {
+    try {
+      const { root } = await attachment.cdp.send<{ root: { nodeId: number } }>(frame.sessionId, 'DOM.getDocument', { depth: 0 });
+      const { nodeId } = await attachment.cdp.send<{ nodeId: number }>(frame.sessionId, 'DOM.querySelector', { nodeId: root.nodeId, selector });
+      if (nodeId && nodeId !== 0) {
+        const { node } = await attachment.cdp.send<{ node: { backendNodeId: number; nodeName: string } }>(frame.sessionId, 'DOM.describeNode', { nodeId });
+        const existing = ctx.controller.registry.findLive(tab.tabId, frame.frameId, frame.loaderId, node.backendNodeId);
+        if (existing) {
+          ctx.session.known.add(tab.tabId, [[existing.ref, { role: existing.print.role, name: existing.print.name }]]);
+          return existing;
+        }
+        const ident = await axIdentity(ctx, frame, node.backendNodeId).catch(() => ({ role: 'generic', name: '' }));
+        const role = 'role' in ident && ident.role ? ident.role : node.nodeName.toLowerCase();
+        const name = 'name' in ident && ident.name ? ident.name : selector;
+        const record = ctx.controller.registry.assign(
+          { tabId: tab.tabId, sessionId: frame.sessionId, frameId: frame.frameId, loaderId: frame.loaderId, backendNodeId: node.backendNodeId },
+          'ax',
+          { role, name }
+        );
+        ctx.session.known.add(tab.tabId, [[record.ref, { role: record.print.role, name: record.print.name }]]);
+        return record;
+      }
+    } catch {
+      // try next frame
+    }
+  }
+  throw new LayerError('NO_MATCH', `No element matches selector "${selector}"`);
+}
+
+async function resolvePoint(ctx: ToolContext, point: { x: number; y: number }): Promise<RefRecord> {
+  const tab = ctx.tab();
+  const attachment = await ctx.attach();
+  const frames = await attachment.topology.frames();
+  const main = frames.find(f => !f.parentFrameId) ?? frames[0];
+  try {
+    const loc = await attachment.cdp.send<{ backendNodeId?: number; frameId?: string }>(
+      main.sessionId,
+      'DOM.getNodeForLocation',
+      { x: Math.round(point.x), y: Math.round(point.y) }
+    );
+    if (loc?.backendNodeId) {
+      const frame = frames.find(f => f.frameId === loc.frameId) ?? main;
+      const existing = ctx.controller.registry.findLive(tab.tabId, frame.frameId, frame.loaderId, loc.backendNodeId);
+      if (existing) {
+        ctx.session.known.add(tab.tabId, [[existing.ref, { role: existing.print.role, name: existing.print.name }]]);
+        return existing;
+      }
+      const ident = await axIdentity(ctx, frame, loc.backendNodeId).catch(() => ({ role: 'generic', name: '' }));
+      const role = 'role' in ident && ident.role ? ident.role : 'element';
+      const name = 'name' in ident && ident.name ? ident.name : `(${point.x}, ${point.y})`;
+      const record = ctx.controller.registry.assign(
+        { tabId: tab.tabId, sessionId: frame.sessionId, frameId: frame.frameId, loaderId: frame.loaderId, backendNodeId: loc.backendNodeId },
+        'ax',
+        { role, name }
+      );
+      ctx.session.known.add(tab.tabId, [[record.ref, { role: record.print.role, name: record.print.name }]]);
+      return record;
+    }
+  } catch {
+    // fallback
+  }
+  throw new LayerError('NO_MATCH', `No element found at coordinates (${point.x}, ${point.y})`);
+}
+
 export async function resolveTarget(
   ctx: ToolContext,
   target: Target,
@@ -131,12 +199,14 @@ export async function resolveTarget(
   } else if (isSemanticTarget(target)) {
     record = await resolveSemantic(ctx, target, options.fresh);
     via = 'semantic';
+  } else if ('selector' in target && typeof target.selector === 'string') {
+    record = await resolveSelector(ctx, target.selector);
+    via = 'selector';
+  } else if ('x' in target && 'y' in target && typeof target.x === 'number' && typeof target.y === 'number') {
+    record = await resolvePoint(ctx, target);
+    via = 'point';
   } else {
-    const capability = 'selector' in target ? 'selector' : 'vision';
-    throw new LayerError(
-      'CAPABILITY_DISABLED',
-      `This target form needs the "${capability}" capability, which this version does not have`,
-    );
+    throw new LayerError('INVALID_ARGUMENT', 'Target must specify ref, role, selector, or coordinates (x, y)');
   }
   return resolveRecord(ctx, record, via);
 }
