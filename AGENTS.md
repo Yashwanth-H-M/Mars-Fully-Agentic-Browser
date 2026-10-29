@@ -100,7 +100,7 @@ pnpm 10.34.7 is pinned in `package.json` (`packageManager`). If the global `pnpm
 - `pnpm install` - Install dependencies (also runs `wxt prepare`)
 - `pnpm dev` - WXT development mode; load `dist/` unpacked in Chrome
 - `pnpm build` - Build the Chrome MV3 extension into `dist/`
-- `pnpm zip` - Build, then pack `dist/` into `dist-zip/nanobrowser-<version>.zip` (source maps left out) for a release or the Chrome Web Store
+- `pnpm zip` - Build, then pack `dist/` into `dist-zip/mars-<version>.zip` (source maps left out) for a release or the Chrome Web Store
 - `pnpm type-check` - TypeScript type checking
 - `pnpm lint` - ESLint, including the import rules: the layer's (`src/browser-control/`) and the extension's (Import rules, above)
 - `pnpm test` - Unit tests (Vitest); tests live in `__tests__/` folders under `src/`

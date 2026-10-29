@@ -43,10 +43,9 @@ Unlike traditional slow web agents that take minutes to click through forms, Mar
 * **Direct-to-Provider:** No middleman servers, no proxy gateways, and no accounts required. All LLM calls travel straight from your browser to your selected AI provider.
 * **Your Keys Stay Yours:** API keys are encrypted in local browser storage and never leave your machine.
 * **Prompt Injection Defenses:** Web content is strictly enclosed within randomized nonce-delimited data boundaries (`<<<page-content>>>`). The agent treats page text purely as untrusted data, never as system instructions.
-* **Strict Human-in-the-Loop Safety:**
-  * **Ask Mode (Default):** The agent automatically asks your permission before submitting forms, deleting items, or sending emails.
-  * **Auto Mode:** Seamlessly executes approved workflows for trusted domains.
-  * **Critical Handover:** Payments, passwords, and CAPTCHAs are unconditionally handed over to you—no AI can ever bypass this.
+* **Autonomous & Flexible Modes:**
+  * **Auto Mode (Default):** Seamlessly and autonomously executes full multi-step workflows, clicks, navigations, searches, and forms end-to-end at maximum speed with zero interruptions.
+  * **Ask Mode:** Optionally switch to Ask mode whenever you want Mars to pause and request your permission before submitting forms or sending messages.
 
 ---
 
