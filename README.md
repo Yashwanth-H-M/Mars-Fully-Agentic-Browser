@@ -65,33 +65,49 @@ Mars connects out of the box to any model provider using the Vercel AI SDK:
 
 ## 🛠️ Quick Start & Installation
 
-### 1. Prerequisites
+### Option 1: Direct Download (Ready to Use — No Node.js Required)
+
+1. Download the pre-built extension zip:
+   - **[Download `mars-0.3.0.zip`](./releases/mars-0.3.0.zip)** (or from the [GitHub Releases](https://github.com/Yashwanth-H-M/Mars-Fully-Agentic-Browser/releases) page).
+2. Unzip `mars-0.3.0.zip` into a folder on your computer.
+3. Open your browser and go to:
+   - **Chrome:** `chrome://extensions`
+   - **Edge:** `edge://extensions`
+4. Enable **Developer mode** (toggle in the top-right corner).
+5. Click **Load unpacked** and select the extracted folder.
+6. Pin Mars and press `Alt+Shift+N` (or click the Mars icon) to launch!
+
+---
+
+### Option 2: Build from Source
+
+#### 1. Prerequisites
 * **Node.js:** `v24.x` (LTS)
 * **pnpm:** `10.x` or run via `corepack pnpm`
 * **Browser:** Google Chrome or Microsoft Edge
 
-### 2. Build from Source
+#### 2. Build the Extension
 ```bash
 # Clone the repository
-git clone https://github.com/yashw/mars.git
-cd mars
+git clone https://github.com/Yashwanth-H-M/Mars-Fully-Agentic-Browser.git
+cd Mars-Fully-Agentic-Browser
 
-# Install dependencies (runs wxt prepare automatically)
+# Install dependencies
 pnpm install
 
-# Build the production extension
+# Build the extension into dist/
 pnpm build
-```
-The compiled extension will be built directly into the `dist/` directory.
 
-### 3. Load into Your Browser
-1. Open your browser and navigate to:
-   * **Chrome:** `chrome://extensions`
-   * **Edge:** `edge://extensions`
+# Or package into a zip:
+pnpm zip
+```
+
+#### 3. Load into Your Browser
+1. Open `chrome://extensions` (or `edge://extensions`).
 2. Toggle on **Developer mode** (top-right corner).
-3. Click **Load unpacked** and select the `dist/` folder inside the project directory.
+3. Click **Load unpacked** and select the `dist/` folder inside the project.
 4. Pin the **Mars** icon to your browser toolbar.
-5. Press `Alt+Shift+N` (or click the Mars icon) to launch Mars in the side panel on any webpage!
+5. Press `Alt+Shift+N` to start using Mars!
 
 ---
 
