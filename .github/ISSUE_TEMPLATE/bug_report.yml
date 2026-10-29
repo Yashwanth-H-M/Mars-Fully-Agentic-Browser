@@ -1,5 +1,5 @@
 name: Bug Report
-description: Create a report to help us improve Nanobrowser
+description: Create a report to help us improve Mars
 title: '[Bug]: '
 labels: ['bug', 'needs-triage']
 body:
@@ -11,8 +11,8 @@ body:
   - type: input
     id: version
     attributes:
-      label: Nanobrowser Version
-      description: What version of Nanobrowser are you running?
+      label: Mars Version
+      description: What version of Mars are you running?
       placeholder: e.g., 0.3.0
     validations:
       required: true

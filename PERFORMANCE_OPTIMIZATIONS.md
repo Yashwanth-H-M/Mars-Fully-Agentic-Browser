@@ -1,6 +1,6 @@
-# Nanobrowser Performance & Speed Optimizations Master Guide
+# Mars Performance & Speed Optimizations Master Guide
 
-This guide documents the complete performance audit of Nanobrowser across all subsystems: Browser Control, In-Page Probes, CDP Host Connection, Agent Loop, Context Compaction, Extension Background Worker, and UI Store.
+This guide documents the complete performance audit of Mars across all subsystems: Browser Control, In-Page Probes, CDP Host Connection, Agent Loop, Context Compaction, Extension Background Worker, and UI Store.
 
 ---
 

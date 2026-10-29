@@ -170,7 +170,7 @@ const SEEDED: Array<{ title: string; content: string }> = [
   {
     title: '🌟 Star us on GitHub!',
     content:
-      "Open the Nanobrowser repository at https://github.com/nanobrowser/nanobrowser and check if you've already starred it. If not, please support us by giving us a star!",
+      "Open the Mars repository at https://github.com/Yashwanth-H-M/Mars-Fully-Agentic-Browser and check if you've already starred it. If not, please support us by giving us a star!",
   },
 ];
 

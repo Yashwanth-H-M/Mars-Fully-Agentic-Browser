@@ -6,7 +6,7 @@ import { useStorage } from '@src/ui/hooks';
 import { t } from '@src/ui/i18n';
 import { SettingsCard, SettingsRow } from './SettingsCard';
 
-export const PRIVACY_URL = 'https://github.com/nanobrowser/nanobrowser/blob/HEAD/PRIVACY.md';
+export const PRIVACY_URL = 'https://github.com/Yashwanth-H-M/Mars-Fully-Agentic-Browser/blob/main/PRIVACY.md';
 
 export function PrivacyCard() {
   const settings = useStorage(settingsStorage, DEFAULT_SETTINGS);
