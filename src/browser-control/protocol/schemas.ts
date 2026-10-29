@@ -5,12 +5,18 @@ import { z } from 'zod';
 const ref = z.string().min(1).max(64).describe('A ref from the latest observation, such as "e12"');
 
 export const RefTargetSchema = z.strictObject({ ref });
-export const SemanticTargetSchema = z.strictObject({
-  role: z.string().min(1).describe('Accessibility role, such as "button" or "link"'),
-  name: z.string().optional().describe('Accessible name; matched exactly after whitespace is collapsed'),
-  nth: z.number().int().min(0).optional().describe('Zero-based index among the matches, in document order'),
-  within: ref.optional().describe('Only match inside the element with this ref'),
-});
+export const SemanticTargetSchema = z
+  .strictObject({
+    role: z.string().min(1).optional().describe('Accessibility role, such as "button", "link", "radio", or "text"'),
+    name: z.string().optional().describe('Accessible name; matched exactly after whitespace is collapsed'),
+    text: z.string().optional().describe('Visible text content or accessible name alias'),
+    label: z.string().optional().describe('Label or name alias'),
+    nth: z.number().int().min(0).optional().describe('Zero-based index among the matches, in document order'),
+    within: ref.optional().describe('Only match inside the element with this ref'),
+  })
+  .refine(t => Boolean(t.role || t.name || t.text || t.label), {
+    message: 'Semantic target must specify at least one of role, name, text, or label',
+  });
 export const SelectorTargetSchema = z.strictObject({
   selector: z.string().min(1).describe('CSS selector (capability "selector")'),
 });
@@ -217,5 +223,5 @@ export function isRefTarget(target: Target): target is RefTarget {
 }
 
 export function isSemanticTarget(target: Target): target is SemanticTarget {
-  return 'role' in target;
+  return 'role' in target || 'name' in target || 'text' in target || 'label' in target;
 }

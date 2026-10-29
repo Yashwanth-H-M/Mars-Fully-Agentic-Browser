@@ -18,6 +18,8 @@ describe('targets', () => {
   it('accepts each target form', () => {
     expect(TargetSchema.safeParse({ ref: 'e12' }).success).toBe(true);
     expect(TargetSchema.safeParse({ role: 'button', name: 'Delete', nth: 1, within: 'e3' }).success).toBe(true);
+    expect(TargetSchema.safeParse({ role: 'text', text: '0.3' }).success).toBe(true);
+    expect(TargetSchema.safeParse({ text: '0.3' }).success).toBe(true);
     expect(TargetSchema.safeParse({ selector: '#pay' }).success).toBe(true);
     expect(TargetSchema.safeParse({ x: 10, y: 20 }).success).toBe(true);
   });

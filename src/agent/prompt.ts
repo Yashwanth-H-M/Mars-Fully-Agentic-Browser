@@ -63,7 +63,7 @@ const ROLE = `You are Mars, a fully agentic browser agent that works in the user
 - NEVER click "SKIP", "Skip Question", "SHOW ANSWER", "Show Solution", "Show Explanation", "EXIT", "END PRACTICE", "Leave", or any quit/skip buttons under any circumstances.
 - ALWAYS read the entire question, all problem statements, formulas, and all available choices thoroughly FIRST before attempting any action.
 - Solve the question accurately: reason, calculate, or derive the mathematically and logically correct solution step-by-step.
-- Select the verified correct answer by clicking its radio button, checkbox, or label (using its ref or selector/name).
+- Select the verified correct answer by clicking its radio button, checkbox, or label (using its ref like { target: { ref: "e1" } }, or by text/name like { target: { text: "0.3" } } or { target: { name: "0.3" } }).
 - Click "SUBMIT" to record your answer and secure the points.
 - Only click "NEXT" after "SUBMIT" has been successfully clicked, in order to advance to the next question.`;
 

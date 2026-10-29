@@ -4,7 +4,7 @@ import type { Target } from '../../protocol/schemas';
 import { isRefTarget, isSemanticTarget } from '../../protocol/schemas';
 import type { ToolContext } from '../controller';
 import type { FrameRecord } from '../ports';
-import type { RefRecord } from '../refs';
+import type { RefPrint, RefRecord } from '../refs';
 import { lookupRef, shownName } from '../refs';
 import { cleanText } from '../perception/ax';
 import type { AXNode } from '../perception/ax';
@@ -50,9 +50,10 @@ function asShown(ctx: ToolContext, observation: Observation, ref: string): RefRe
  */
 async function resolveSemantic(
   ctx: ToolContext,
-  target: { role: string; name?: string; nth?: number; within?: string },
+  target: { role?: string; name?: string; text?: string; label?: string; nth?: number; within?: string },
   fresh = false,
 ): Promise<RefRecord> {
+  const searchName = target.name ?? target.text ?? target.label;
   const observation = fresh ? await observeTab(ctx) : await recentObservation(ctx);
   const tabId = ctx.tab().tabId;
   let roots = observation.tree;
@@ -65,17 +66,26 @@ async function resolveSemantic(
     if (!found) throw new LayerError('NODE_DETACHED', `Ref ${target.within} is no longer in the page`);
     roots = found.children;
   }
-  const role = target.role.toLowerCase();
-  const name = target.name === undefined ? undefined : cleanText(target.name);
+  const role = target.role?.toLowerCase();
+  const name = searchName === undefined ? undefined : cleanText(searchName);
   const matches: ONode[] = [];
   walk(roots, n => {
     if (!n.ref) return;
-    if (n.role.toLowerCase() !== role && n.rawRole.toLowerCase() !== role) return;
-    if (name !== undefined && n.name !== name) return;
+    if (role && role !== 'text' && n.role.toLowerCase() !== role && n.rawRole.toLowerCase() !== role) return;
+    if (name !== undefined && n.name !== name && !n.name.includes(name)) return;
     matches.push(n);
   });
-  const label = `${target.role}${name !== undefined ? ` ${quote(name)}` : ''}`;
-  if (!matches.length) throw new LayerError('NO_MATCH', `No element matches ${label}`);
+  const label = `${target.role ?? 'element'}${name !== undefined ? ` ${quote(name)}` : ''}`;
+  if (!matches.length) {
+    if (searchName) {
+      try {
+        return await resolveByText(ctx, searchName, target.nth ?? 0);
+      } catch {
+        // fall through to error
+      }
+    }
+    throw new LayerError('NO_MATCH', `No element matches ${label}`);
+  }
   if (target.nth !== undefined) {
     const pick = matches[target.nth];
     if (!pick)
@@ -86,6 +96,10 @@ async function resolveSemantic(
     return asShown(ctx, observation, pick.ref!);
   }
   if (matches.length > 1) {
+    const exact = name !== undefined ? matches.filter(m => m.name === name) : matches;
+    if (exact.length === 1) {
+      return asShown(ctx, observation, exact[0].ref!);
+    }
     const list = matches.slice(0, 10).map(m => `[${m.ref}] ${m.role} ${quote(m.name, 60)}`);
     throw new LayerError(
       'AMBIGUOUS_TARGET',
@@ -113,6 +127,17 @@ export function describeTarget(ctx: ToolContext, record: RefRecord): string {
   return text;
 }
 
+function makeSyntheticPrint(role: string, name: string): RefPrint {
+  return {
+    role,
+    name,
+    tag: role,
+    text: name,
+    nth: null,
+    context: null,
+  };
+}
+
 /**
  * Revalidation: the ref is known and was shown; its frame still has the same document; the node still resolves; and
  * Chrome's accessibility tree still gives it the role and name the agent was shown.
@@ -129,18 +154,19 @@ async function resolveSelector(ctx: ToolContext, selector: string): Promise<RefR
         const { node } = await attachment.cdp.send<{ node: { backendNodeId: number; nodeName: string } }>(frame.sessionId, 'DOM.describeNode', { nodeId });
         const existing = ctx.controller.registry.findLive(tab.tabId, frame.frameId, frame.loaderId, node.backendNodeId);
         if (existing) {
-          ctx.session.known.add(tab.tabId, [[existing.ref, { role: existing.print.role, name: existing.print.name }]]);
+          ctx.session.known.add(tab.tabId, [[existing.ref, { source: existing.source, print: existing.print }]]);
           return existing;
         }
         const ident = await axIdentity(ctx, frame, node.backendNodeId).catch(() => ({ role: 'generic', name: '' }));
         const role = 'role' in ident && ident.role ? ident.role : node.nodeName.toLowerCase();
         const name = 'name' in ident && ident.name ? ident.name : selector;
+        const print = makeSyntheticPrint(role, name);
         const record = ctx.controller.registry.assign(
           { tabId: tab.tabId, sessionId: frame.sessionId, frameId: frame.frameId, loaderId: frame.loaderId, backendNodeId: node.backendNodeId },
           'ax',
-          { role, name }
+          print
         );
-        ctx.session.known.add(tab.tabId, [[record.ref, { role: record.print.role, name: record.print.name }]]);
+        ctx.session.known.add(tab.tabId, [[record.ref, { source: record.source, print: record.print }]]);
         return record;
       }
     } catch {
@@ -165,24 +191,126 @@ async function resolvePoint(ctx: ToolContext, point: { x: number; y: number }): 
       const frame = frames.find(f => f.frameId === loc.frameId) ?? main;
       const existing = ctx.controller.registry.findLive(tab.tabId, frame.frameId, frame.loaderId, loc.backendNodeId);
       if (existing) {
-        ctx.session.known.add(tab.tabId, [[existing.ref, { role: existing.print.role, name: existing.print.name }]]);
+        ctx.session.known.add(tab.tabId, [[existing.ref, { source: existing.source, print: existing.print }]]);
         return existing;
       }
       const ident = await axIdentity(ctx, frame, loc.backendNodeId).catch(() => ({ role: 'generic', name: '' }));
       const role = 'role' in ident && ident.role ? ident.role : 'element';
       const name = 'name' in ident && ident.name ? ident.name : `(${point.x}, ${point.y})`;
+      const print = makeSyntheticPrint(role, name);
       const record = ctx.controller.registry.assign(
         { tabId: tab.tabId, sessionId: frame.sessionId, frameId: frame.frameId, loaderId: frame.loaderId, backendNodeId: loc.backendNodeId },
         'ax',
-        { role, name }
+        print
       );
-      ctx.session.known.add(tab.tabId, [[record.ref, { role: record.print.role, name: record.print.name }]]);
+      ctx.session.known.add(tab.tabId, [[record.ref, { source: record.source, print: record.print }]]);
       return record;
     }
   } catch {
     // fallback
   }
   throw new LayerError('NO_MATCH', `No element found at coordinates (${point.x}, ${point.y})`);
+}
+
+async function resolveByText(ctx: ToolContext, text: string, nth = 0): Promise<RefRecord> {
+  const tab = ctx.tab();
+  const attachment = await ctx.attach();
+  const frames = await attachment.topology.frames();
+  for (const frame of frames) {
+    try {
+      const res = await attachment.cdp.send<{ result: { objectId?: string } }>(frame.sessionId, 'Runtime.evaluate', {
+        expression: `(() => {
+          const target = ${JSON.stringify(text.trim())}.toLowerCase();
+          const clean = s => (s || '').trim().replace(/\\s+/g, ' ');
+
+          // 1. Labels with matching text
+          const labels = Array.from(document.querySelectorAll('label'));
+          for (const l of labels) {
+            if (clean(l.textContent).toLowerCase() === target || clean(l.innerText).toLowerCase() === target) {
+              const input = l.querySelector('input') || (l.htmlFor ? document.getElementById(l.htmlFor) : null);
+              if (input) return input;
+              return l;
+            }
+          }
+
+          // 2. Radio buttons, checkboxes, buttons, options near or containing matching text
+          const inputs = Array.from(document.querySelectorAll('input, button, [role="radio"], [role="checkbox"], [role="button"], [role="option"]'));
+          for (const el of inputs) {
+            if (clean(el.value).toLowerCase() === target ||
+                clean(el.getAttribute('aria-label')).toLowerCase() === target) {
+              return el;
+            }
+            const parent = el.closest('label') || el.closest('li') || el.parentElement;
+            if (parent && (clean(parent.textContent).toLowerCase() === target || clean(parent.innerText).toLowerCase() === target)) {
+              return el;
+            }
+          }
+
+          // 3. Elements with exact text match (prefer leaf elements)
+          const all = Array.from(document.querySelectorAll('span, p, div, label, li, td, th, a, button, input'));
+          const exact = [];
+          for (const el of all) {
+            if (clean(el.innerText || el.textContent).toLowerCase() === target) {
+              exact.push(el);
+            }
+          }
+          if (exact.length > 0) {
+            exact.sort((a, b) => a.children.length - b.children.length || (a.textContent || '').length - (b.textContent || '').length);
+            const pick = exact[${nth}] || exact[0];
+            const parent = pick.closest('label') || pick.parentElement;
+            const radio = parent ? parent.querySelector('input[type="radio"], input[type="checkbox"]') : null;
+            return radio || pick;
+          }
+
+          // 4. Substring text match in leaf elements
+          const partial = [];
+          for (const el of all) {
+            if (el.children.length === 0 && clean(el.innerText || el.textContent).toLowerCase().includes(target)) {
+              partial.push(el);
+            }
+          }
+          if (partial.length > 0) {
+            const pick = partial[${nth}] || partial[0];
+            const parent = pick.closest('label') || pick.parentElement;
+            const radio = parent ? parent.querySelector('input[type="radio"], input[type="checkbox"]') : null;
+            return radio || pick;
+          }
+
+          return null;
+        })()`,
+        returnByValue: false,
+      });
+
+      if (res?.result?.objectId) {
+        const { node } = await attachment.cdp.send<{ node: { backendNodeId: number; nodeName: string } }>(
+          frame.sessionId,
+          'DOM.describeNode',
+          { objectId: res.result.objectId }
+        );
+        if (node?.backendNodeId) {
+          const existing = ctx.controller.registry.findLive(tab.tabId, frame.frameId, frame.loaderId, node.backendNodeId);
+          if (existing) {
+            ctx.session.known.add(tab.tabId, [[existing.ref, { source: existing.source, print: existing.print }]]);
+            return existing;
+          }
+          const ident = await axIdentity(ctx, frame, node.backendNodeId).catch(() => ({ role: 'generic', name: '' }));
+          const role = 'role' in ident && ident.role ? ident.role : node.nodeName.toLowerCase();
+          const name = 'name' in ident && ident.name ? ident.name : text;
+          const print = makeSyntheticPrint(role, name);
+          const record = ctx.controller.registry.assign(
+            { tabId: tab.tabId, sessionId: frame.sessionId, frameId: frame.frameId, loaderId: frame.loaderId, backendNodeId: node.backendNodeId },
+            'ax',
+            print
+          );
+          ctx.session.known.add(tab.tabId, [[record.ref, { source: record.source, print: record.print }]]);
+          return record;
+        }
+      }
+    } catch {
+      // try next frame
+    }
+  }
+  throw new LayerError('NO_MATCH', `No element matches text "${text}"`);
 }
 
 export async function resolveTarget(
