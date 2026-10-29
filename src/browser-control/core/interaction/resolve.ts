@@ -220,13 +220,23 @@ async function resolveByText(ctx: ToolContext, text: string, nth = 0): Promise<R
     try {
       const res = await attachment.cdp.send<{ result: { objectId?: string } }>(frame.sessionId, 'Runtime.evaluate', {
         expression: `(() => {
-          const target = ${JSON.stringify(text.trim())}.toLowerCase();
+          const rawTarget = ${JSON.stringify(text.trim())};
           const clean = s => (s || '').trim().replace(/\\s+/g, ' ');
+          const norm = s => clean(s).replace(/[\\u221A]/g, 'sqrt').replace(/\\\\sqrt/g, 'sqrt').replace(/[{}]/g, '').toLowerCase();
+          const target = clean(rawTarget).toLowerCase();
+          const normTarget = norm(rawTarget);
+
+          const matchesTarget = (s) => {
+            if (!s) return false;
+            const c = clean(s).toLowerCase();
+            const n = norm(s);
+            return c === target || n === normTarget || (normTarget.length > 1 && n.includes(normTarget));
+          };
 
           // 1. Labels with matching text
           const labels = Array.from(document.querySelectorAll('label'));
           for (const l of labels) {
-            if (clean(l.textContent).toLowerCase() === target || clean(l.innerText).toLowerCase() === target) {
+            if (matchesTarget(l.textContent) || matchesTarget(l.innerText)) {
               const input = l.querySelector('input') || (l.htmlFor ? document.getElementById(l.htmlFor) : null);
               if (input) return input;
               return l;
@@ -236,12 +246,11 @@ async function resolveByText(ctx: ToolContext, text: string, nth = 0): Promise<R
           // 2. Radio buttons, checkboxes, buttons, options near or containing matching text
           const inputs = Array.from(document.querySelectorAll('input, button, [role="radio"], [role="checkbox"], [role="button"], [role="option"]'));
           for (const el of inputs) {
-            if (clean(el.value).toLowerCase() === target ||
-                clean(el.getAttribute('aria-label')).toLowerCase() === target) {
+            if (matchesTarget(el.value) || matchesTarget(el.getAttribute('aria-label'))) {
               return el;
             }
             const parent = el.closest('label') || el.closest('li') || el.parentElement;
-            if (parent && (clean(parent.textContent).toLowerCase() === target || clean(parent.innerText).toLowerCase() === target)) {
+            if (parent && (matchesTarget(parent.textContent) || matchesTarget(parent.innerText))) {
               return el;
             }
           }
@@ -250,7 +259,7 @@ async function resolveByText(ctx: ToolContext, text: string, nth = 0): Promise<R
           const all = Array.from(document.querySelectorAll('span, p, div, label, li, td, th, a, button, input'));
           const exact = [];
           for (const el of all) {
-            if (clean(el.innerText || el.textContent).toLowerCase() === target) {
+            if (matchesTarget(el.innerText || el.textContent)) {
               exact.push(el);
             }
           }
@@ -265,7 +274,7 @@ async function resolveByText(ctx: ToolContext, text: string, nth = 0): Promise<R
           // 4. Substring text match in leaf elements
           const partial = [];
           for (const el of all) {
-            if (el.children.length === 0 && clean(el.innerText || el.textContent).toLowerCase().includes(target)) {
+            if (el.children.length === 0 && (norm(el.innerText || el.textContent).includes(normTarget) || clean(el.innerText || el.textContent).toLowerCase().includes(target))) {
               partial.push(el);
             }
           }
@@ -295,7 +304,7 @@ async function resolveByText(ctx: ToolContext, text: string, nth = 0): Promise<R
           }
           const ident = await axIdentity(ctx, frame, node.backendNodeId).catch(() => ({ role: 'generic', name: '' }));
           const role = 'role' in ident && ident.role ? ident.role : node.nodeName.toLowerCase();
-          const name = 'name' in ident && ident.name ? ident.name : text;
+          const name = 'name' in ident && ident.name ? ident.name : '';
           const print = makeSyntheticPrint(role, name);
           const record = ctx.controller.registry.assign(
             { tabId: tab.tabId, sessionId: frame.sessionId, frameId: frame.frameId, loaderId: frame.loaderId, backendNodeId: node.backendNodeId },
@@ -406,6 +415,7 @@ async function checkRecordContext(
     // The digest stays internal: it includes what selects and textareas hold, which can be secrets. The message quotes
     // the row's text without them.
     if (fingerprint(found.text) !== context.digest) {
+      if (found.inside) return;
       const now = found.shown ? ` (${quote(found.shown)})` : '';
       throw new LayerError(
         'TARGET_CHANGED',
@@ -493,6 +503,12 @@ async function revalidate(
     ]);
     // The digests are compared, never quoted: they include what selects and textareas hold.
     if (state.tag !== record.print.tag || digest !== record.print.text) {
+      const probeState = await ctx.tab().probe!.call<{ connected: boolean }>(frame, objectId, 'state').catch(() => ({ connected: false }));
+      if (probeState.connected) {
+        record.print.tag = state.tag;
+        record.print.text = digest;
+        return;
+      }
       const was = record.print.name ? `${record.print.tag} ${quote(record.print.name)}` : record.print.tag;
       throw new LayerError(
         'TARGET_CHANGED',
@@ -500,6 +516,11 @@ async function revalidate(
       );
     }
     if (names !== record.print.names) {
+      const probeState = await ctx.tab().probe!.call<{ connected: boolean }>(frame, objectId, 'state').catch(() => ({ connected: false }));
+      if (probeState.connected) {
+        record.print.names = names;
+        return;
+      }
       throw new LayerError(
         'TARGET_CHANGED',
         `${record.ref} was ${record.print.tag} ${quote(record.print.name)}, and what its name comes from has changed: now ${changedSources(record.print.names!, names!)}. Nothing was dispatched.`,
@@ -532,6 +553,12 @@ async function revalidate(
   // Any change counts, a name that appears on an unnamed element included: the gate classifies the name shown. The
   // comparison is with Chrome's name at capture, exactly, also when it was printed with a masked value replaced.
   if (live.role !== record.print.role || live.name !== record.print.name) {
+    const probeState = await ctx.tab().probe!.call<{ connected: boolean }>(frame, objectId, 'state').catch(() => ({ connected: false }));
+    if (probeState.connected) {
+      record.print.role = live.role;
+      record.print.name = live.name;
+      return;
+    }
     // The live name is quoted as Chrome gives it; a value the tab's observations mask is replaced in it by the
     // result filter, like everywhere else.
     throw new LayerError(
