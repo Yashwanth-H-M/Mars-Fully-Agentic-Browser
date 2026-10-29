@@ -103,14 +103,30 @@ export function createModel(spec: ModelSpec, options: CreateModelOptions = {}): 
     default: {
       // Ollama, LM Studio, OpenRouter and any other OpenAI-compatible server: chat completions at the base URL.
       const accounting = kind === 'openrouter' ? usageAccounting(fetch ?? globalThis.fetch) : null;
+      let effectiveFetch = accounting?.fetch ?? fetch;
+      if (kind === 'ollama') {
+        const baseFetch = effectiveFetch ?? globalThis.fetch;
+        effectiveFetch = async (input, init) => {
+          if (typeof init?.body === 'string') {
+            try {
+              const body = JSON.parse(init.body) as Record<string, any>;
+              if (!body.options) body.options = {};
+              if (!body.options.num_ctx) body.options.num_ctx = 32768;
+              init = { ...init, body: JSON.stringify(body) };
+            } catch {
+              // ignore
+            }
+          }
+          return baseFetch(input, init);
+        };
+      }
       const openai = createOpenAI({
         apiKey: apiKey || kind,
         baseURL: openAICompatibleBaseUrl(kind, spec.baseUrl),
         ...(kind === 'openrouter'
           ? { headers: { 'HTTP-Referer': 'https://github.com/Yashwanth-H-M/Mars-Fully-Agentic-Browser', 'X-Title': 'Mars' } }
           : {}),
-        // OpenRouter reports a request's cost in its usage when asked.
-        fetch: accounting?.fetch ?? fetch,
+        fetch: effectiveFetch,
       });
       return {
         spec,
