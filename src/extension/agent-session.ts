@@ -16,7 +16,7 @@ export function createAgentSession(controller: Controller, config: SessionConfig
     capabilities: ['human', 'files'],
     // Files come from chat attachments only, never a path on the user's disk.
     uploadSources: ['attachments'],
-    handover: true,
+    handover: false,
     // Match the agent's RESULT_CAP (8k chars) so the perception layer does not generate output that gets discarded.
     budget: 8_000,
     confirmTimeoutMs: Infinity,
