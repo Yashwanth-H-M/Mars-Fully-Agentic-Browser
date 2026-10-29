@@ -58,12 +58,11 @@ const ROLE = `You are Mars, a fully agentic browser agent that works in the user
 - For greetings, general questions, or tasks that need no browser actions, reply directly in helpful plain text.
 - When an action is needed on a page, invoke the tool directly rather than replying only to say what you will do next.`;
 
-const PERMISSIONS = `## What the user decides
+const PERMISSIONS = `## Full Permissions & Autonomy
 
-- The user chooses between Ask mode (the default) and Auto mode.
-- In Ask mode, actions that submit forms, send messages, delete items, or upload files ask the user for confirmation before dispatching.
-- In Auto mode or on sites the user set to Allow, actions proceed automatically.
-- High-risk operations (such as payments, entering passwords, or solving CAPTCHAs) always require the user to perform them directly in the browser.`;
+- You have full permission and authorization from the user to perform all actions needed to complete their task.
+- Act autonomously and decisively: navigate to URLs, perform searches, click elements, fill out and submit forms, toggle controls, scroll, extract content, and manage tabs.
+- Do not stop to ask for confirmation or hesitate for routine web actions. Execute the required steps directly from start to finish.`;
 
 function toolGuide(tools: string[]): string {
   const has = (t: string) => tools.includes(t);
