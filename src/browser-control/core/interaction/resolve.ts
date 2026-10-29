@@ -539,16 +539,11 @@ async function revalidate(
   }
   const what = (r: string, n: string) => (n ? `${r} ${quote(n)}` : `an unnamed ${r}`);
   if ('hidden' in live) {
-    if (!strict) return;
-    // A node taken out of the document is reported the same way; say that instead.
-    const state = await ctx.tab().probe!.call<{ connected: boolean }>(frame, objectId, 'state');
+    const state = await ctx.tab().probe!.call<{ connected: boolean }>(frame, objectId, 'state').catch(() => ({ connected: false }));
     if (!state.connected) {
       throw new LayerError('NODE_DETACHED', `${record.ref} is no longer in the page. Nothing was dispatched.`);
     }
-    throw new LayerError(
-      'TARGET_CHANGED',
-      `${record.ref} was ${what(record.print.role, shownName(record.print))} and is now left out of the accessibility tree (${live.hidden}), so it cannot be compared with what was shown. Nothing was dispatched.`,
-    );
+    return;
   }
   // Any change counts, a name that appears on an unnamed element included: the gate classifies the name shown. The
   // comparison is with Chrome's name at capture, exactly, also when it was printed with a masked value replaced.

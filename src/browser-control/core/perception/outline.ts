@@ -167,6 +167,8 @@ export interface ONode {
   unseen?: boolean;
   /** Set for nodes found or made actionable by layout signals (tier 2): revalidated by tag and text digest. */
   layout?: { tag: string; digest: string; names: string };
+  /** Screen bounding box [x, y, width, height] in CSS pixels for spatial awareness. */
+  box?: [number, number, number, number];
   children: ONode[];
 }
 
@@ -540,6 +542,18 @@ export function stitchFrames(capture: Capture): {
       summary.frames++;
       summary.added += enriched.stats.added;
       summary.promoted += enriched.stats.promoted;
+      const attachBoxes = (nodes: ONode[]) => {
+        for (const n of nodes) {
+          if (n.backendNodeId) {
+            const el = doc.byBackendId.get(n.backendNodeId);
+            if (el?.bounds) {
+              n.box = el.bounds;
+            }
+          }
+          attachBoxes(n.children);
+        }
+      };
+      attachBoxes(tree);
     }
     trees.set(frame.frameId, tree);
   }
@@ -701,9 +715,11 @@ export function quote(s: string, max = MAX_TEXT): string {
 }
 
 export function renderLine(n: ONode): string {
-  if (n.kind === 'text') return `text ${quote(n.name)}`;
+  const box = n.box ? ` [box: ${Math.round(n.box[0])},${Math.round(n.box[1])},${Math.round(n.box[2])}x${Math.round(n.box[3])}]` : '';
+  if (n.kind === 'text') return `text ${quote(n.name)}${box}`;
   let line = n.ref ? `[${n.ref}] ${n.role}` : n.role;
   if (n.name) line += ` ${quote(n.name)}`;
+  line += box;
   if (n.states.length) line += ` (${n.states.join(', ')})`;
   if (n.value !== undefined) line += ` = ${n.masked ? `"${MASK}" (masked)` : quote(n.value, 200)}`;
   if (n.site) line += ` (site ${n.site})`;

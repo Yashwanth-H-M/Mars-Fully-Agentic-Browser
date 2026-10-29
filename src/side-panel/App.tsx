@@ -32,7 +32,7 @@ import { installTestHook } from './test-hook';
 import type { SavedShortcut } from '@src/store/shortcuts';
 import { useShortcuts } from '@src/ui/shortcuts';
 import { AutoNotice } from '@src/ui/auto-notice';
-import { HistoryIcon, LogoMark, NewChatIcon, SettingsIcon } from '@src/ui/icons';
+import { FileIcon, HistoryIcon, LogoMark, NewChatIcon, SettingsIcon } from '@src/ui/icons';
 import { websiteUrl } from '@src/ui/links';
 
 const NO_PROVIDERS: ProviderConfig[] = [];
@@ -60,6 +60,83 @@ function showTab(tabId: number): void {
 /** Saves text as a file from the panel, through an anchor's download. */
 function downloadText(filename: string, text: string): void {
   const url = URL.createObjectURL(new Blob([text], { type: 'text/markdown' }));
+  const a = Object.assign(document.createElement('a'), { href: url, download: filename });
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+/** Formats the session's full activity and tool trace for Windows Notepad (.txt with CRLF). */
+function generateNotepadLog(state: typeof INITIAL): string {
+  const lines: string[] = [];
+  const divider = '='.repeat(70);
+  const subDivider = '-'.repeat(70);
+
+  lines.push(divider);
+  lines.push(' MARS FULLY AGENTIC BROWSER - DEBUG RUN LOG');
+  lines.push(` Export Date: ${new Date().toLocaleString()}`);
+  lines.push(` Conversation ID: ${state.conversationId ?? 'Current Session'}`);
+  lines.push(` Status: ${state.status}`);
+  if (state.live?.model) {
+    lines.push(` Model: ${state.live.model.model} (${state.live.model.providerId})`);
+  }
+  lines.push(divider);
+  lines.push('');
+
+  if (state.entries.length === 0) {
+    lines.push('No activity recorded yet in this session.');
+  }
+
+  for (const entry of state.entries) {
+    const time = entry.at ? new Date(entry.at).toLocaleTimeString() : '';
+    if (entry.kind === 'user') {
+      lines.push(`[${time}] USER PROMPT:`);
+      lines.push(entry.text);
+      lines.push(subDivider);
+      lines.push('');
+    } else if (entry.kind === 'assistant') {
+      lines.push(`[${time}] MARS AGENT ACTIVITY:`);
+      if (entry.tools && entry.tools.length > 0) {
+        lines.push('Actions & Tool Calls:');
+        for (const tool of entry.tools) {
+          const status = tool.status === 'done' ? '[OK]' : tool.status === 'failed' ? '[FAILED]' : `[${tool.status.toUpperCase()}]`;
+          lines.push(`  ${status} Tool: ${tool.tool}`);
+          if (tool.args) {
+            lines.push(`       Arguments: ${JSON.stringify(tool.args, null, 2).replace(/\n/g, '\n       ')}`);
+          }
+          if (tool.text) {
+            lines.push(`       Observation/Text: ${tool.text.split('\n')[0]}`);
+          }
+          if (tool.result) {
+            const resObj = tool.result as Record<string, any>;
+            if (resObj?.error) {
+              lines.push(`       Error: [${resObj.error.code}] ${resObj.error.message || ''}`);
+            }
+          }
+        }
+      }
+      if (entry.text) {
+        lines.push('');
+        lines.push('Agent Response:');
+        lines.push(entry.text);
+      }
+      lines.push(subDivider);
+      lines.push('');
+    } else if (entry.kind === 'notice') {
+      lines.push(`[${time}] SYSTEM NOTICE (${entry.tone}): ${entry.text}`);
+      lines.push('');
+    }
+  }
+
+  lines.push('[END OF LOG]');
+  return lines.join('\r\n');
+}
+
+function downloadLogForNotepad(state: typeof INITIAL): void {
+  const log = generateNotepadLog(state);
+  const now = new Date();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const filename = `mars-log-${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}.txt`;
+  const url = URL.createObjectURL(new Blob([log], { type: 'text/plain;charset=utf-8' }));
   const a = Object.assign(document.createElement('a'), { href: url, download: filename });
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
@@ -375,6 +452,12 @@ export function App() {
         {/* The title is for screen readers only; the header shows the mark and three buttons. */}
         <h1 className="sr-only">{conversation?.title || t('panel.newChat')}</h1>
         <span className="flex-1" />
+        <IconButton
+          label="Save log for Notepad"
+          title="Save log file (.txt for Notepad)"
+          onClick={() => downloadLogForNotepad(state)}>
+          <FileIcon size={16} />
+        </IconButton>
         <IconButton label={t('panel.newChat')} onClick={() => newChat(confirmNewChat)}>
           <NewChatIcon />
         </IconButton>
