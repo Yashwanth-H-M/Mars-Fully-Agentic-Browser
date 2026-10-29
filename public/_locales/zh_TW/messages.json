@@ -1,0 +1,17 @@
+{
+  "extName": {
+    "message": "Mars: Fully Agentic Browser"
+  },
+  "extDescription": {
+    "message": "在你的瀏覽器中工作的完全自主 AI 代理程式，位於頁面旁的側邊面板中"
+  },
+  "actionTitle": {
+    "message": "開啟 Mars"
+  },
+  "commandOpenPanel": {
+    "message": "開啟 Mars 側邊面板"
+  },
+  "menuAskAboutSelection": {
+    "message": "向 Mars 詢問這段內容"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "extName": {
+    "message": "Mars: Fully Agentic Browser"
+  },
+  "extDescription": {
+    "message": "Mars is a fully agentic AI browser assistant that works in your browser side panel to automate web tasks"
+  },
+  "actionTitle": {
+    "message": "Open Mars"
+  },
+  "commandOpenPanel": {
+    "message": "Open the Mars panel"
+  },
+  "menuAskAboutSelection": {
+    "message": "Ask Mars about this"
+  }
+}
