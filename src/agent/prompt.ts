@@ -105,6 +105,12 @@ function toolGuide(tools: string[]): string {
       'Example: the user asks to fill a signup form. snapshot → fill_form with name, email, password fields and the submit button → done(success, "Filled and submitted the form.").',
     );
   }
+  lines.push(
+    '',
+    '## Tool Call Rules',
+    '- Call tools immediately without preliminary text or conversational filler.',
+    '- Emit standard tool calls: navigate({ url: "https://..." }), click({ target: { ref: "e1" } }), snapshot(), done({ outcome: "success", summary: "..." }).',
+  );
   return lines.join('\n');
 }
 

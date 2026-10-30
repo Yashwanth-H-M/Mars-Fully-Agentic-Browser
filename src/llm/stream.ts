@@ -99,6 +99,82 @@ export function toToolSet(tools: Record<string, ToolDefinition>): ToolSet {
   );
 }
 
+export function normalizeToolInput(toolName: string, raw: any): Record<string, any> {
+  const input = typeof raw === 'object' && raw !== null && !Array.isArray(raw) ? { ...raw } : {};
+  if (typeof raw === 'string') {
+    if (toolName === 'navigate') return { url: raw };
+    if (toolName === 'click' || toolName === 'read' || toolName === 'hover') return { target: { ref: raw } };
+    if (toolName === 'ask_user') return { question: raw };
+    if (toolName === 'done') return { outcome: 'success', summary: raw };
+    return { value: raw };
+  }
+  if (toolName === 'click' || toolName === 'hover' || toolName === 'read' || toolName === 'set') {
+    if (input.ref && !input.target) {
+      input.target = { ref: String(input.ref) };
+      delete input.ref;
+    } else if (typeof input.target === 'string') {
+      input.target = { ref: input.target };
+    }
+  }
+  if (toolName === 'done') {
+    if (!input.outcome) input.outcome = 'success';
+    if (!input.summary && input.text) {
+      input.summary = input.text;
+      delete input.text;
+    }
+  }
+  if (toolName === 'ask_user') {
+    if (!input.question && input.text) {
+      input.question = input.text;
+      delete input.text;
+    }
+  }
+  return input;
+}
+
+export function parseRelaxedJson(raw: string): any {
+  let s = raw.trim();
+  if (s.startsWith('(') && s.endsWith(')')) s = s.slice(1, -1).trim();
+  if (!s) return {};
+
+  try {
+    return JSON.parse(s);
+  } catch {}
+
+  if ((s.startsWith('{') && s.endsWith('}')) || (s.startsWith('[') && s.endsWith(']'))) {
+    try {
+      const relaxed = s
+        .replace(/([{,]\s*)([a-zA-Z_$][a-zA-Z0-9_$-]*)\s*:/g, '$1"$2":')
+        .replace(/'([^'\\]*(?:\\.[^'\\]*)*)'/g, '"$1"')
+        .replace(/,\s*([}\]])/g, '$1')
+        .replace(/\bTrue\b/g, 'true')
+        .replace(/\bFalse\b/g, 'false')
+        .replace(/\bNone\b/g, 'null');
+      return JSON.parse(relaxed);
+    } catch {}
+  }
+
+  if (/^[a-zA-Z_$][a-zA-Z0-9_$-]*\s*=/.test(s)) {
+    try {
+      const wrapped = '{' + s.replace(/([a-zA-Z_$][a-zA-Z0-9_$-]*)\s*=/g, '"$1":') + '}';
+      const relaxed = wrapped
+        .replace(/'([^'\\]*(?:\\.[^'\\]*)*)'/g, '"$1"')
+        .replace(/,\s*([}\]])/g, '$1')
+        .replace(/\bTrue\b/g, 'true')
+        .replace(/\bFalse\b/g, 'false')
+        .replace(/\bNone\b/g, 'null');
+      return JSON.parse(relaxed);
+    } catch {}
+  }
+
+  const strMatch = /^["'](.*)["']$/.exec(s);
+  if (strMatch) {
+    return strMatch[1];
+  }
+
+  return null;
+}
+
 export function extractToolCallsFromText(text: string, tools: Record<string, ToolDefinition>): ToolCallRequest[] {
   const known = new Set(Object.keys(tools));
   const results: ToolCallRequest[] = [];
@@ -118,7 +194,7 @@ export function extractToolCallsFromText(text: string, tools: Record<string, Too
       results.push({
         toolCallId: `call_${Math.random().toString(36).slice(2, 10)}`,
         toolName: name,
-        input: args,
+        input: normalizeToolInput(name, args),
       });
       return true;
     }
@@ -130,27 +206,84 @@ export function extractToolCallsFromText(text: string, tools: Record<string, Too
   if (tags) {
     for (const t of tags) {
       const clean = t.replace(/<\/?tool_call>/g, '').trim();
-      try {
-        tryAdd(JSON.parse(clean));
-      } catch {}
+      const parsed = parseRelaxedJson(clean);
+      if (parsed) tryAdd(parsed);
     }
     if (results.length > 0) return results;
   }
 
   // 2. Direct JSON or code block
-  const stripped = text.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
-  try {
-    if (tryAdd(JSON.parse(stripped))) return results;
-  } catch {}
+  const stripped = text.trim().replace(/^```(?:json|javascript|js|python|py)?\s*/i, '').replace(/\s*```$/, '').trim();
+  const directParsed = parseRelaxedJson(stripped);
+  if (directParsed && tryAdd(directParsed)) return results;
 
-  // 3. Embedded JSON object
+  // 3. Function call syntax: tool_name(...)
+  for (const name of known) {
+    const regex = new RegExp(`(?:^|[\\s\`(\\[;]|call:|tool:)${name}\\s*\\(`, 'g');
+    let match: RegExpExecArray | null;
+    while ((match = regex.exec(text)) !== null) {
+      const openParenIndex = text.indexOf('(', match.index);
+      if (openParenIndex === -1) continue;
+      const startArgs = openParenIndex + 1;
+      let depth = 1;
+      let inString: string | null = null;
+      let endArgs = -1;
+      for (let i = startArgs; i < text.length; i++) {
+        const ch = text[i];
+        if (inString) {
+          if (ch === '\\') {
+            i++;
+            continue;
+          }
+          if (ch === inString) inString = null;
+        } else {
+          if (ch === '"' || ch === "'" || ch === '`') inString = ch;
+          else if (ch === '(') depth++;
+          else if (ch === ')') {
+            depth--;
+            if (depth === 0) {
+              endArgs = i;
+              break;
+            }
+          }
+        }
+      }
+      if (endArgs !== -1) {
+        const rawArgs = text.slice(startArgs, endArgs).trim();
+        const parsed = parseRelaxedJson(rawArgs);
+        if (parsed !== null) {
+          results.push({
+            toolCallId: `call_${Math.random().toString(36).slice(2, 10)}`,
+            toolName: name,
+            input: normalizeToolInput(name, parsed),
+          });
+        }
+      }
+    }
+  }
+  if (results.length > 0) return results;
+
+  // 4. Embedded JSON object
   const matches = text.match(/\{[\s\S]*?"(?:name|tool)"\s*:\s*"[^"]+"[\s\S]*?\}/g);
   if (matches) {
     for (const m of matches) {
-      try {
-        tryAdd(JSON.parse(m));
-      } catch {}
+      const parsed = parseRelaxedJson(m);
+      if (parsed) tryAdd(parsed);
     }
+  }
+
+  // 5. Line calls: ask_user: ...
+  const askMatch = /(?:^|\n)\s*ask_user\s*:\s*(.+)(?:\n|$)/i.exec(text);
+  if (askMatch && known.has('ask_user')) {
+    let q = askMatch[1].trim();
+    if ((q.startsWith('"') && q.endsWith('"')) || (q.startsWith("'") && q.endsWith("'"))) {
+      q = q.slice(1, -1);
+    }
+    results.push({
+      toolCallId: `call_${Math.random().toString(36).slice(2, 10)}`,
+      toolName: 'ask_user',
+      input: { question: q },
+    });
   }
 
   return results;
@@ -295,7 +428,7 @@ async function streamTurnNow(request: TurnRequest): Promise<TurnResult> {
               toolCallId: part.toolCallId,
               toolName: part.toolName,
               input: part.input,
-              invalid,
+              ...(invalid ? { invalid } : {}),
               ...(part.providerMetadata ? { providerOptions: part.providerMetadata } : {}),
             });
             break;

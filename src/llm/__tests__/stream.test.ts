@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { APICallError } from 'ai';
 import { ScriptedModel } from '../scripted';
-import { backoffMs, DEFAULT_RETRY, streamTurn } from '../stream';
+import { backoffMs, DEFAULT_RETRY, extractToolCallsFromText, streamTurn } from '../stream';
 
 const tools = {
   click: { description: 'Click', parameters: { type: 'object', properties: { ref: { type: 'string' } } } },
@@ -156,5 +156,38 @@ describe('the limit per local server', () => {
     );
     expect(runs.every(r => r.text === 'ok')).toBe(true);
     expect(max).toBe(1);
+  });
+
+  it('extracts function call text emitted by local models like qwen2.5-coder', () => {
+    const testTools = {
+      navigate: { description: 'Navigate', parameters: {} },
+      click: { description: 'Click', parameters: {} },
+      ask_user: { description: 'Ask', parameters: {} },
+      done: { description: 'Done', parameters: {} },
+    };
+
+    // User's exact screenshot case:
+    const res1 = extractToolCallsFromText('navigate({action: "goto", url: "https://www.youtube.com"})', testTools);
+    expect(res1).toHaveLength(1);
+    expect(res1[0].toolName).toBe('navigate');
+    expect(res1[0].input).toEqual({ action: 'goto', url: 'https://www.youtube.com' });
+
+    // Shorthand click ref
+    const res2 = extractToolCallsFromText('click({ref: "e1"})', testTools);
+    expect(res2).toHaveLength(1);
+    expect(res2[0].toolName).toBe('click');
+    expect(res2[0].input).toEqual({ target: { ref: 'e1' } });
+
+    // In markdown code block
+    const res3 = extractToolCallsFromText('```javascript\nnavigate({url: "https://youtube.com"})\n```', testTools);
+    expect(res3).toHaveLength(1);
+    expect(res3[0].toolName).toBe('navigate');
+    expect(res3[0].input).toEqual({ url: 'https://youtube.com' });
+
+    // String URL navigate
+    const res4 = extractToolCallsFromText('navigate("https://www.youtube.com")', testTools);
+    expect(res4).toHaveLength(1);
+    expect(res4[0].toolName).toBe('navigate');
+    expect(res4[0].input).toEqual({ url: 'https://www.youtube.com' });
   });
 });
