@@ -266,7 +266,7 @@ export function App() {
     () =>
       providers.flatMap(p =>
         p.models
-          .filter(m => !m.noToolCalling)
+          .filter(m => !m.noToolCalling || p.kind === 'ollama')
           .map(m => {
             const ref = { providerId: p.id, model: m.name };
             return { ref, label: `${m.name} · ${p.name}`, name: m.name, capability: capabilityOf(providers, ref) };

@@ -99,6 +99,63 @@ export function toToolSet(tools: Record<string, ToolDefinition>): ToolSet {
   );
 }
 
+export function extractToolCallsFromText(text: string, tools: Record<string, ToolDefinition>): ToolCallRequest[] {
+  const known = new Set(Object.keys(tools));
+  const results: ToolCallRequest[] = [];
+
+  const tryAdd = (obj: any): boolean => {
+    if (!obj || typeof obj !== 'object') return false;
+    const name = obj.name || obj.function?.name || obj.tool;
+    let args = obj.arguments || obj.function?.arguments || obj.args || obj.parameters || {};
+    if (typeof args === 'string') {
+      try {
+        args = JSON.parse(args);
+      } catch {
+        // keep string
+      }
+    }
+    if (name && typeof name === 'string' && known.has(name)) {
+      results.push({
+        toolCallId: `call_${Math.random().toString(36).slice(2, 10)}`,
+        toolName: name,
+        input: args,
+      });
+      return true;
+    }
+    return false;
+  };
+
+  // 1. Tag format: <tool_call>...</tool_call>
+  const tags = text.match(/<tool_call>([\s\S]*?)<\/tool_call>/g);
+  if (tags) {
+    for (const t of tags) {
+      const clean = t.replace(/<\/?tool_call>/g, '').trim();
+      try {
+        tryAdd(JSON.parse(clean));
+      } catch {}
+    }
+    if (results.length > 0) return results;
+  }
+
+  // 2. Direct JSON or code block
+  const stripped = text.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
+  try {
+    if (tryAdd(JSON.parse(stripped))) return results;
+  } catch {}
+
+  // 3. Embedded JSON object
+  const matches = text.match(/\{[\s\S]*?"(?:name|tool)"\s*:\s*"[^"]+"[\s\S]*?\}/g);
+  if (matches) {
+    for (const m of matches) {
+      try {
+        tryAdd(JSON.parse(m));
+      } catch {}
+    }
+  }
+
+  return results;
+}
+
 function sleepFor(ms: number, signal?: AbortSignal): Promise<void> {
   return new Promise(resolve => {
     const timer = setTimeout(resolve, ms);
@@ -268,6 +325,14 @@ async function streamTurnNow(request: TurnRequest): Promise<TurnResult> {
       return { text, toolCalls: [], finish: 'aborted', usage, durationMs: Date.now() - start, attempts: attempt };
     }
     if (failure === undefined) {
+      if (toolCalls.length === 0 && request.tools && text.trim()) {
+        const extracted = extractToolCallsFromText(text, request.tools);
+        if (extracted.length > 0) {
+          toolCalls.push(...extracted);
+          text = '';
+          finish = 'tool-calls';
+        }
+      }
       const cost = usage && usage.cost === undefined ? await request.chat.takeCost?.() : undefined;
       if (usage && cost !== undefined) usage = { ...usage, cost };
       return {

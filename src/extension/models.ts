@@ -41,7 +41,7 @@ export async function resolveModel(pair: LivePair | null): Promise<ResolvedModel
   const providers = await providersStorage.get();
   const found = findModel(providers, ref);
   if (!found) throw new ModelUnavailable(`The model ${ref.model} is no longer configured. Choose another one.`);
-  if (found.model.noToolCalling) {
+  if (found.model.noToolCalling && found.provider.kind !== 'ollama' && found.provider.kind !== 'lmstudio') {
     throw new ModelUnavailable(`${ref.model} did not pass the tool-calling test and cannot run the agent.`);
   }
   const keys = await keysStorage.get();
