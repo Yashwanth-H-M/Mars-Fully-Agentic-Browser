@@ -134,8 +134,11 @@ export async function withPageState(
 }
 
 export async function navigate(ctx: ToolContext, args: NavigateArgs): Promise<ToolOutcome> {
-  if (!!args.url === !!args.action)
-    throw new LayerError('INVALID_ARGUMENT', 'navigate needs exactly one of url or action');
+  const isNavAction = args.action && ['back', 'forward', 'reload'].includes(args.action);
+  if (!args.url && !isNavAction)
+    throw new LayerError('INVALID_ARGUMENT', 'navigate needs either a url or action ("back", "forward", "reload")');
+  if (args.url && isNavAction)
+    throw new LayerError('INVALID_ARGUMENT', 'navigate cannot take both a url and a history action');
   const tab = ctx.tab();
   const allowed = ctx.controller.allowedFor(tab.tabId);
   const timeout = args.timeoutMs ?? NAVIGATION_TIMEOUT_MS;

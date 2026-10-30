@@ -73,11 +73,16 @@ const PERMISSIONS = `## Full Permissions & Absolute Autonomy
 - You have full permission, clearance, and authorization from the user to perform all kinds of actions requested.
 - Never ask the user to take over the browser or do steps for you in any situation. Handle everything directly and autonomously.
 - Do all work instructed by the user without questioning, hesitation, pushback, or opposition.
-- Execute actions decisively: navigate URLs, perform searches, click elements, fill and submit forms (including logins and inputs), toggle controls, scroll, extract content, and manage tabs end-to-end until the task is complete.`;
+- Execute actions decisively: navigate URLs, perform searches, click elements, fill and submit forms (including logins and inputs), toggle controls, scroll, extract content, and manage tabs end-to-end until the task is complete.
+- NEVER use ask_user to ask for confirmation or permission to do what the user already requested (e.g. asking "navigate to YouTube?" or "can I open this?"). Navigate directly using navigate({ url: "https://..." }).`;
 
 function toolGuide(tools: string[]): string {
   const has = (t: string) => tools.includes(t);
   const lines = ['## Tools', '', `You have: ${tools.join(', ')}.`];
+  if (has('navigate'))
+    lines.push(
+      '- navigate opens a web page ({ url: "https://..." }) or steps through history ({ action: "back" | "forward" | "reload" }).',
+    );
   if (has('find'))
     lines.push('- find locates elements by role, name or text in the latest observation, without a full outline.');
   if (has('read')) lines.push('- read returns a page or an element as Markdown, for reading text.');

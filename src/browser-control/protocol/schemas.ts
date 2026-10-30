@@ -150,7 +150,7 @@ export const WaitArgsSchema = z.strictObject({
 export const NavigateArgsSchema = z.strictObject({
   ...actionCommon,
   url: z.string().optional(),
-  action: z.enum(['back', 'forward', 'reload']).optional(),
+  action: z.enum(['back', 'forward', 'reload', 'open', 'goto', 'navigate']).optional(),
 });
 
 export const TabsArgsSchema = z.strictObject({
