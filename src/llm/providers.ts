@@ -87,21 +87,7 @@ export function createModel(spec: ModelSpec, options: CreateModelOptions = {}): 
     }
     case 'gemini': {
       const google = createGoogle({ apiKey, ...(spec.baseUrl ? { baseURL: spec.baseUrl } : {}), fetch });
-      return {
-        spec,
-        model: google(modelName),
-        providerOptions: {
-          google: {
-            safetySettings: [
-              { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
-              { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' },
-              { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
-              { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
-              { category: 'HARM_CATEGORY_CIVIC_INTEGRITY', threshold: 'BLOCK_NONE' },
-            ],
-          },
-        },
-      };
+      return { spec, model: google(modelName) };
     }
     case 'openai': {
       // The Responses API: GPT-6 models refuse function tools with reasoning on chat completions. Nothing is stored
