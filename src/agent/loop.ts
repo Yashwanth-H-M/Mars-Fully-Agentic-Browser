@@ -428,8 +428,8 @@ export class AgentLoop {
       );
     }
     this.#seen.set(active.tabId, active.url);
-    // Kept within budget: a share of the window, at 4 characters a token.
-    const budget = Math.max(2_000, Math.min(30_000, this.options.model.profile.contextWindow * 4 * 0.2));
+    // Kept within budget: a share of the window, at 4 characters a token (max 16k chars to optimize token usage & speed).
+    const budget = Math.max(2_000, Math.min(16_000, this.options.model.profile.contextWindow * 4 * 0.2));
     const outline = cutText(result.text, budget, '… the outline was cut; take a snapshot to see more.');
     const user = [...(await activeBranch(this.options.conversationId))]
       .reverse()
