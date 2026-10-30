@@ -892,6 +892,7 @@ export class AgentLoop {
       reasoning,
       noneRetry,
       signal,
+      retry: { attempts: 4, baseMs: 1500, maxMs: 30_000 },
       onTextDelta: delta => {
         text += delta;
         emit({ type: 'message_update', id, text });
