@@ -189,5 +189,22 @@ describe('the limit per local server', () => {
     expect(res4).toHaveLength(1);
     expect(res4[0].toolName).toBe('navigate');
     expect(res4[0].input).toEqual({ url: 'https://www.youtube.com' });
+
+    // Bare snapshot as emitted by qwen2.5-coder in latest screenshot
+    const res5 = extractToolCallsFromText('snapshot', { ...testTools, snapshot: { description: 'snap', parameters: {} } });
+    expect(res5).toHaveLength(1);
+    expect(res5[0].toolName).toBe('snapshot');
+    expect(res5[0].input).toEqual({});
+
+    // Bare snapshot with backticks
+    const res6 = extractToolCallsFromText('`snapshot`', { ...testTools, snapshot: { description: 'snap', parameters: {} } });
+    expect(res6).toHaveLength(1);
+    expect(res6[0].toolName).toBe('snapshot');
+
+    // Shorthand click [e12]
+    const res7 = extractToolCallsFromText('click [e12]', testTools);
+    expect(res7).toHaveLength(1);
+    expect(res7[0].toolName).toBe('click');
+    expect(res7[0].input).toEqual({ target: { ref: 'e12' } });
   });
 });

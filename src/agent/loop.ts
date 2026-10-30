@@ -398,21 +398,35 @@ export class AgentLoop {
   async firstTurn(): Promise<void> {
     const branch = await activeBranch(this.options.conversationId);
     const earlierResults = branch.some(e => e.type === 'message' && e.message.role === 'tool');
-    if (earlierResults) {
-      await this.writer.appNote(
-        'this run continues the conversation. Refs from earlier runs are no longer valid; take a snapshot before acting on a page.',
-      );
-    }
     await this.#inlineAttachments();
     const tabs = await this.options.layer.tabs().catch(() => null);
     const active = tabs?.tabs.find(t => t.tabId === tabs.activeTabId);
-    if (!active || !/^https?:/i.test(active.url)) return;
+    if (!active || !/^https?:/i.test(active.url)) {
+      if (earlierResults) {
+        await this.writer.appNote(
+          'this run continues the conversation. Refs from earlier runs are no longer valid; take a snapshot before acting on a page.',
+        );
+      }
+      return;
+    }
     const result = await this.options.layer.call(
       'snapshot',
       { tabId: active.tabId, mode: 'all', window: 'near' },
       this.options.signal,
     );
-    if (!result.ok) return;
+    if (!result.ok) {
+      if (earlierResults) {
+        await this.writer.appNote(
+          'this run continues the conversation. Refs from earlier runs are no longer valid; take a snapshot before acting on a page.',
+        );
+      }
+      return;
+    }
+    if (earlierResults) {
+      await this.writer.appNote(
+        'this run continues the conversation. Refs from earlier runs are no longer valid; a fresh outline of the active page is attached to the user message below. Use its refs to act directly.',
+      );
+    }
     this.#seen.set(active.tabId, active.url);
     // Kept within budget: a share of the window, at 4 characters a token.
     const budget = Math.max(2_000, Math.min(30_000, this.options.model.profile.contextWindow * 4 * 0.2));

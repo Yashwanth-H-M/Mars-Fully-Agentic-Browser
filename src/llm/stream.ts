@@ -286,6 +286,46 @@ export function extractToolCallsFromText(text: string, tools: Record<string, Too
     });
   }
 
+  // 6. Bare or shorthand line calls
+  if (known.has('snapshot') && /(?:^|\n)\s*(?:call:|tool:)?\s*`*snapshot(?:\(\))?`*[\s\.;]*(?:\n|$)/i.test(text)) {
+    results.push({
+      toolCallId: `call_${Math.random().toString(36).slice(2, 10)}`,
+      toolName: 'snapshot',
+      input: {},
+    });
+    return results;
+  }
+
+  const clickLineMatch = /(?:^|\n)\s*(?:call:|tool:)?\s*`*click\s+\[?([a-zA-Z0-9_-]+)\]?`*[\s\.;]*(?:\n|$)/i.exec(text);
+  if (clickLineMatch && known.has('click')) {
+    results.push({
+      toolCallId: `call_${Math.random().toString(36).slice(2, 10)}`,
+      toolName: 'click',
+      input: { target: { ref: clickLineMatch[1] } },
+    });
+    return results;
+  }
+
+  const readLineMatch = /(?:^|\n)\s*(?:call:|tool:)?\s*`*read\s+\[?([a-zA-Z0-9_-]+)\]?`*[\s\.;]*(?:\n|$)/i.exec(text);
+  if (readLineMatch && known.has('read')) {
+    results.push({
+      toolCallId: `call_${Math.random().toString(36).slice(2, 10)}`,
+      toolName: 'read',
+      input: { target: { ref: readLineMatch[1] } },
+    });
+    return results;
+  }
+
+  const navLineMatch = /(?:^|\n)\s*(?:call:|tool:)?\s*`*navigate\s+(https?:\/\/[^\s`"']+)/i.exec(text);
+  if (navLineMatch && known.has('navigate')) {
+    results.push({
+      toolCallId: `call_${Math.random().toString(36).slice(2, 10)}`,
+      toolName: 'navigate',
+      input: { url: navLineMatch[1] },
+    });
+    return results;
+  }
+
   return results;
 }
 

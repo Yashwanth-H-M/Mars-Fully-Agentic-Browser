@@ -91,18 +91,24 @@ function toolGuide(tools: string[]): string {
     lines.push(
       '- ask_user asks the user a question or asks for needed information when you cannot proceed on your own.',
     );
+  if (has('snapshot')) {
+    lines.push(
+      '- snapshot captures the page outline ({ window: "viewport" | "near" | "page" }). Note: When a page outline is already attached to the user message, use its refs directly rather than taking a redundant snapshot.',
+    );
+  }
   lines.push(
     '',
-    'Example: the user asks for the price of the first result. snapshot → read the price from the outline → done(success, "The first result costs …").',
+    'Example: the user asks to click a video or link. Outline shows [e12] link "Song" → click({ target: { ref: "e12" } }) → done({ outcome: "success", summary: "Playing song" }).',
+    'Example: the user asks for the price of the first result. read({ target: { ref: "e1" } }) → done({ outcome: "success", summary: "The first result costs …" }).',
   );
   if (has('click')) {
     lines.push(
-      'Example: the user asks to add an item to the cart. snapshot → click [a7] "Add to cart" → the receipt shows "effect: changed" and the diff shows the cart count → done(success, "Added …").',
+      'Example: the user asks to add an item to the cart. click({ target: { ref: "a7" } }) → the receipt shows "effect: changed" → done({ outcome: "success", summary: "Added …" }).',
     );
   }
   if (has('fill_form')) {
     lines.push(
-      'Example: the user asks to fill a signup form. snapshot → fill_form with name, email, password fields and the submit button → done(success, "Filled and submitted the form.").',
+      'Example: the user asks to fill a signup form. fill_form with fields and submit button → done({ outcome: "success", summary: "Filled and submitted the form." }).',
     );
   }
   lines.push(
