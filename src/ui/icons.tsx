@@ -231,8 +231,7 @@ export function Logo({ height = 28, className = '' }: { height?: number; classNa
       />
       <span
         style={{ fontSize: Math.round(height * 0.85) }}
-        className="font-sans font-bold tracking-tight text-[#E64A19] dark:text-[#FF7043]"
-      >
+        className="font-sans font-bold tracking-tight text-[#E64A19] dark:text-[#FF7043]">
         Mars
       </span>
     </div>

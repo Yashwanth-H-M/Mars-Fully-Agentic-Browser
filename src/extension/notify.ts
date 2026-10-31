@@ -29,11 +29,7 @@ export async function notifyNeeds(prompt: OpenPrompt, fallbackTab: number | unde
 }
 
 export async function notifyFinished(conversationId: string, ok: boolean, tabId: number | undefined): Promise<void> {
-  await show(
-    `done-${conversationId}`,
-    ok ? 'Mars finished the task.' : 'Mars stopped before finishing.',
-    tabId,
-  );
+  await show(`done-${conversationId}`, ok ? 'Mars finished the task.' : 'Mars stopped before finishing.', tabId);
 }
 
 async function show(id: string, message: string, tabId: number | undefined): Promise<void> {

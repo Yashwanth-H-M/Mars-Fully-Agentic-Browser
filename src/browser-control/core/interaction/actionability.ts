@@ -117,7 +117,7 @@ async function checkOnce(ctx: ToolContext, target: ResolvedTarget, needs: Needs)
   const viaLabel = !quad && needs.pointer && (state.type === 'checkbox' || state.type === 'radio');
   const pointOf = async (reuse?: Quad | null): Promise<{ quad: Quad; point: Point } | null> => {
     if (!viaLabel) {
-      const q = reuse ?? await firstQuad(ctx, target);
+      const q = reuse ?? (await firstQuad(ctx, target));
       return q ? { quad: q, point: quadCenter(q) } : null;
     }
     return labelPoint(ctx, target);

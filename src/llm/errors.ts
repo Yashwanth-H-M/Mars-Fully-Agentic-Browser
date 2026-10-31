@@ -40,7 +40,12 @@ export function isRetryable(error: unknown): boolean {
     return status === 408 || status === 409 || status === 429 || status >= 500;
   }
   const anyErr = unwrapped as { status?: number; statusCode?: number; message?: string } | undefined;
-  const status = typeof anyErr?.status === 'number' ? anyErr.status : typeof anyErr?.statusCode === 'number' ? anyErr.statusCode : undefined;
+  const status =
+    typeof anyErr?.status === 'number'
+      ? anyErr.status
+      : typeof anyErr?.statusCode === 'number'
+        ? anyErr.statusCode
+        : undefined;
   if (status !== undefined) {
     return status === 408 || status === 409 || status === 429 || status >= 500;
   }
@@ -55,12 +60,16 @@ export function isRetryable(error: unknown): boolean {
 /** The delay a `Retry-After` (seconds or a date) or `retry-after-ms` header asks for, in milliseconds. */
 export function retryAfterMs(error: unknown, now = Date.now()): number | undefined {
   const unwrapped = unwrapError(error);
-  const anyErr = unwrapped as {
-    responseHeaders?: Record<string, string> | Headers;
-    headers?: Record<string, string> | Headers;
-    message?: string;
-  } | undefined;
-  const headers = (APICallError.isInstance(unwrapped) ? unwrapped.responseHeaders : anyErr?.responseHeaders ?? anyErr?.headers) ?? {};
+  const anyErr = unwrapped as
+    | {
+        responseHeaders?: Record<string, string> | Headers;
+        headers?: Record<string, string> | Headers;
+        message?: string;
+      }
+    | undefined;
+  const headers =
+    (APICallError.isInstance(unwrapped) ? unwrapped.responseHeaders : (anyErr?.responseHeaders ?? anyErr?.headers)) ??
+    {};
   const get = (name: string) => {
     if (typeof (headers as Headers).get === 'function') return (headers as Headers).get(name);
     return Object.entries(headers).find(([k]) => k.toLowerCase() === name)?.[1];

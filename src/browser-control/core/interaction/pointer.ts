@@ -47,7 +47,13 @@ export function watchDialog(cdp: CdpPort) {
     };
   });
   const off = cdp.on('Page.javascriptDialogOpening', params => resolveDialog(params as DialogInfo));
-  return { opened, get current() { return current; }, dispose: off };
+  return {
+    opened,
+    get current() {
+      return current;
+    },
+    dispose: off,
+  };
 }
 
 /** Sends one input command, raced against a dialog. A dialog that opens first wins; the command stays outstanding. */

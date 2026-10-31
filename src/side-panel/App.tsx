@@ -98,7 +98,8 @@ function generateNotepadLog(state: typeof INITIAL): string {
       if (entry.tools && entry.tools.length > 0) {
         lines.push('Actions & Tool Calls:');
         for (const tool of entry.tools) {
-          const status = tool.status === 'done' ? '[OK]' : tool.status === 'failed' ? '[FAILED]' : `[${tool.status.toUpperCase()}]`;
+          const status =
+            tool.status === 'done' ? '[OK]' : tool.status === 'failed' ? '[FAILED]' : `[${tool.status.toUpperCase()}]`;
           lines.push(`  ${status} Tool: ${tool.tool}`);
           if (tool.args) {
             lines.push(`       Arguments: ${JSON.stringify(tool.args, null, 2).replace(/\n/g, '\n       ')}`);

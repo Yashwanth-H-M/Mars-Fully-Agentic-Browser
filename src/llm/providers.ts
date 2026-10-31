@@ -110,7 +110,10 @@ export function createModel(spec: ModelSpec, options: CreateModelOptions = {}): 
           if (typeof init?.body === 'string') {
             try {
               const body = JSON.parse(init.body) as Record<string, unknown>;
-              const options = (body.options && typeof body.options === 'object' ? body.options : {}) as Record<string, unknown>;
+              const options = (body.options && typeof body.options === 'object' ? body.options : {}) as Record<
+                string,
+                unknown
+              >;
               if (!options.num_ctx) options.num_ctx = 32768;
               body.options = options;
               init = { ...init, body: JSON.stringify(body) };
@@ -125,7 +128,12 @@ export function createModel(spec: ModelSpec, options: CreateModelOptions = {}): 
         apiKey: apiKey || kind,
         baseURL: openAICompatibleBaseUrl(kind, spec.baseUrl),
         ...(kind === 'openrouter'
-          ? { headers: { 'HTTP-Referer': 'https://github.com/Yashwanth-H-M/Mars-Fully-Agentic-Browser', 'X-Title': 'Mars' } }
+          ? {
+              headers: {
+                'HTTP-Referer': 'https://github.com/Yashwanth-H-M/Mars-Fully-Agentic-Browser',
+                'X-Title': 'Mars',
+              },
+            }
           : {}),
         fetch: effectiveFetch,
       });

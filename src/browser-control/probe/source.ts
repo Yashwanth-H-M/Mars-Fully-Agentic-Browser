@@ -986,9 +986,7 @@ export function probeMain(): void {
         (hit !== null && target.contains(hit)) ||
         (hit !== null &&
           hit.contains(target) &&
-          (target.tagName === 'TEXTAREA' ||
-            target.tagName === 'INPUT' ||
-            (target as HTMLElement).isContentEditable)) ||
+          (target.tagName === 'TEXTAREA' || target.tagName === 'INPUT' || (target as HTMLElement).isContentEditable)) ||
         (hit !== null &&
           targetEditor !== null &&
           (targetEditor === hit.closest(EDITOR_SEL) || targetEditor.contains(hit))) ||

@@ -762,7 +762,8 @@ export class AgentLoop {
           return {
             status: 'failed',
             outcome: 'failed',
-            reason: 'The model returned an empty response without executing any actions. If using LM Studio, ensure you are using an Instruct model (such as Qwen2.5-Coder-7B-Instruct) with GPU Offload enabled in LM Studio settings.',
+            reason:
+              'The model returned an empty response without executing any actions. If using LM Studio, ensure you are using an Instruct model (such as Qwen2.5-Coder-7B-Instruct) with GPU Offload enabled in LM Studio settings.',
             usage: this.#usage,
             turns: this.#turns,
           };
@@ -1168,9 +1169,7 @@ export class AgentLoop {
       // Mutations: intermediate mutations in a batch use observe: 'none' for lightning speed;
       // the last mutation in the batch observes 'diff' to report the page state.
       const sent =
-        kind === 'mutate' && call.toolName !== 'tabs'
-          ? { ...args, observe: isLastInBatch ? 'diff' : 'none' }
-          : args;
+        kind === 'mutate' && call.toolName !== 'tabs' ? { ...args, observe: isLastInBatch ? 'diff' : 'none' } : args;
       const result = await this.options.layer.call(call.toolName, sent, signal);
       outcome = { call, kind, text: result.text, isError: !result.ok, result };
     }

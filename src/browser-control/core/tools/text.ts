@@ -862,9 +862,15 @@ export async function type(ctx: ToolContext, args: TypeArgs): Promise<ToolOutcom
         if (args.text.includes('\n') || (chars.length > 50 && target)) {
           const { cdp } = await ctx.attach();
           if (target) {
-            const isEditor = await ctx.tab().probe?.call<boolean>(target.frame, target.objectId, 'isEditor').catch(() => false);
+            const isEditor = await ctx
+              .tab()
+              .probe?.call<boolean>(target.frame, target.objectId, 'isEditor')
+              .catch(() => false);
             if (isEditor) {
-              await ctx.tab().probe?.call(target.frame, target.objectId, 'selectContents').catch(() => false);
+              await ctx
+                .tab()
+                .probe?.call(target.frame, target.objectId, 'selectContents')
+                .catch(() => false);
             }
           }
           const dialog = await keys.unit(async () => {

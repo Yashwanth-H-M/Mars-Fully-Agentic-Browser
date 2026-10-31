@@ -75,7 +75,9 @@ async function resolveSemantic(
     if (name !== undefined) {
       const cleanNodeName = (n.name ?? '').trim().toLowerCase();
       const targetQuery = name.trim().toLowerCase();
-      const isControl = ['radio', 'checkbox', 'button', 'option', 'menuitemradio', 'menuitemcheckbox', 'link'].includes(n.role.toLowerCase());
+      const isControl = ['radio', 'checkbox', 'button', 'option', 'menuitemradio', 'menuitemcheckbox', 'link'].includes(
+        n.role.toLowerCase(),
+      );
       if (cleanNodeName === targetQuery) {
         matches.push(n);
         return;
@@ -84,7 +86,10 @@ async function resolveSemantic(
       if (targetQuery.length <= 5 && !isControl) return;
       if (targetQuery.length <= 5 && cleanNodeName.length > 20) return;
       // Word boundary match:
-      const wordRegex = new RegExp(`(^|\\s|[.,;:-])${targetQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}($|\\s|[.,;:-])`, 'i');
+      const wordRegex = new RegExp(
+        `(^|\\s|[.,;:-])${targetQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}($|\\s|[.,;:-])`,
+        'i',
+      );
       if (wordRegex.test(cleanNodeName)) {
         matches.push(n);
         return;
@@ -187,10 +192,19 @@ async function resolveSelector(ctx: ToolContext, selector: string): Promise<RefR
   const frames = await attachment.topology.frames();
   for (const frame of frames) {
     try {
-      const { root } = await attachment.cdp.send<{ root: { nodeId: number } }>(frame.sessionId, 'DOM.getDocument', { depth: 0 });
-      const { nodeId } = await attachment.cdp.send<{ nodeId: number }>(frame.sessionId, 'DOM.querySelector', { nodeId: root.nodeId, selector });
+      const { root } = await attachment.cdp.send<{ root: { nodeId: number } }>(frame.sessionId, 'DOM.getDocument', {
+        depth: 0,
+      });
+      const { nodeId } = await attachment.cdp.send<{ nodeId: number }>(frame.sessionId, 'DOM.querySelector', {
+        nodeId: root.nodeId,
+        selector,
+      });
       if (nodeId && nodeId !== 0) {
-        const { node } = await attachment.cdp.send<{ node: { backendNodeId: number; nodeName: string } }>(frame.sessionId, 'DOM.describeNode', { nodeId });
+        const { node } = await attachment.cdp.send<{ node: { backendNodeId: number; nodeName: string } }>(
+          frame.sessionId,
+          'DOM.describeNode',
+          { nodeId },
+        );
         const existing = ctx.controller.registry.findLive(tab.tabId, frame.frameId, frame.loaderId, node.backendNodeId);
         if (existing) {
           ctx.session.known.add(tab.tabId, [[existing.ref, { source: existing.source, print: existing.print }]]);
@@ -201,9 +215,15 @@ async function resolveSelector(ctx: ToolContext, selector: string): Promise<RefR
         const name = 'name' in ident && ident.name ? ident.name : selector;
         const print = makeSyntheticPrint(role, name);
         const record = ctx.controller.registry.assign(
-          { tabId: tab.tabId, sessionId: frame.sessionId, frameId: frame.frameId, loaderId: frame.loaderId, backendNodeId: node.backendNodeId },
+          {
+            tabId: tab.tabId,
+            sessionId: frame.sessionId,
+            frameId: frame.frameId,
+            loaderId: frame.loaderId,
+            backendNodeId: node.backendNodeId,
+          },
           'ax',
-          print
+          print,
         );
         ctx.session.known.add(tab.tabId, [[record.ref, { source: record.source, print: record.print }]]);
         return record;
@@ -224,7 +244,7 @@ async function resolvePoint(ctx: ToolContext, point: { x: number; y: number }): 
     const loc = await attachment.cdp.send<{ backendNodeId?: number; frameId?: string }>(
       main.sessionId,
       'DOM.getNodeForLocation',
-      { x: Math.round(point.x), y: Math.round(point.y) }
+      { x: Math.round(point.x), y: Math.round(point.y) },
     );
     if (loc?.backendNodeId) {
       const frame = frames.find(f => f.frameId === loc.frameId) ?? main;
@@ -238,9 +258,15 @@ async function resolvePoint(ctx: ToolContext, point: { x: number; y: number }): 
       const name = 'name' in ident && ident.name ? ident.name : `(${point.x}, ${point.y})`;
       const print = makeSyntheticPrint(role, name);
       const record = ctx.controller.registry.assign(
-        { tabId: tab.tabId, sessionId: frame.sessionId, frameId: frame.frameId, loaderId: frame.loaderId, backendNodeId: loc.backendNodeId },
+        {
+          tabId: tab.tabId,
+          sessionId: frame.sessionId,
+          frameId: frame.frameId,
+          loaderId: frame.loaderId,
+          backendNodeId: loc.backendNodeId,
+        },
         'ax',
-        print
+        print,
       );
       ctx.session.known.add(tab.tabId, [[record.ref, { source: record.source, print: record.print }]]);
       return record;
@@ -354,10 +380,15 @@ async function resolveByText(ctx: ToolContext, text: string, nth = 0): Promise<R
         const { node } = await attachment.cdp.send<{ node: { backendNodeId: number; nodeName: string } }>(
           frame.sessionId,
           'DOM.describeNode',
-          { objectId: res.result.objectId }
+          { objectId: res.result.objectId },
         );
         if (node?.backendNodeId) {
-          const existing = ctx.controller.registry.findLive(tab.tabId, frame.frameId, frame.loaderId, node.backendNodeId);
+          const existing = ctx.controller.registry.findLive(
+            tab.tabId,
+            frame.frameId,
+            frame.loaderId,
+            node.backendNodeId,
+          );
           if (existing) {
             ctx.session.known.add(tab.tabId, [[existing.ref, { source: existing.source, print: existing.print }]]);
             return existing;
@@ -367,9 +398,15 @@ async function resolveByText(ctx: ToolContext, text: string, nth = 0): Promise<R
           const name = 'name' in ident && ident.name ? ident.name : '';
           const print = makeSyntheticPrint(role, name);
           const record = ctx.controller.registry.assign(
-            { tabId: tab.tabId, sessionId: frame.sessionId, frameId: frame.frameId, loaderId: frame.loaderId, backendNodeId: node.backendNodeId },
+            {
+              tabId: tab.tabId,
+              sessionId: frame.sessionId,
+              frameId: frame.frameId,
+              loaderId: frame.loaderId,
+              backendNodeId: node.backendNodeId,
+            },
             'ax',
-            print
+            print,
           );
           ctx.session.known.add(tab.tabId, [[record.ref, { source: record.source, print: record.print }]]);
           return record;
@@ -563,7 +600,10 @@ async function revalidate(
     ]);
     // The digests are compared, never quoted: they include what selects and textareas hold.
     if (state.tag !== record.print.tag || digest !== record.print.text) {
-      const probeState = await ctx.tab().probe!.call<{ connected: boolean }>(frame, objectId, 'state').catch(() => ({ connected: false }));
+      const probeState = await ctx
+        .tab()
+        .probe!.call<{ connected: boolean }>(frame, objectId, 'state')
+        .catch(() => ({ connected: false }));
       if (probeState.connected) {
         record.print.tag = state.tag;
         record.print.text = digest;
@@ -576,7 +616,10 @@ async function revalidate(
       );
     }
     if (names !== record.print.names) {
-      const probeState = await ctx.tab().probe!.call<{ connected: boolean }>(frame, objectId, 'state').catch(() => ({ connected: false }));
+      const probeState = await ctx
+        .tab()
+        .probe!.call<{ connected: boolean }>(frame, objectId, 'state')
+        .catch(() => ({ connected: false }));
       if (probeState.connected) {
         record.print.names = names;
         return;
@@ -599,7 +642,10 @@ async function revalidate(
   }
   const what = (r: string, n: string) => (n ? `${r} ${quote(n)}` : `an unnamed ${r}`);
   if ('hidden' in live) {
-    const state = await ctx.tab().probe!.call<{ connected: boolean }>(frame, objectId, 'state').catch(() => ({ connected: false }));
+    const state = await ctx
+      .tab()
+      .probe!.call<{ connected: boolean }>(frame, objectId, 'state')
+      .catch(() => ({ connected: false }));
     if (!state.connected) {
       throw new LayerError('NODE_DETACHED', `${record.ref} is no longer in the page. Nothing was dispatched.`);
     }
@@ -608,7 +654,10 @@ async function revalidate(
   // Any change counts, a name that appears on an unnamed element included: the gate classifies the name shown. The
   // comparison is with Chrome's name at capture, exactly, also when it was printed with a masked value replaced.
   if (live.role !== record.print.role || live.name !== record.print.name) {
-    const probeState = await ctx.tab().probe!.call<{ connected: boolean }>(frame, objectId, 'state').catch(() => ({ connected: false }));
+    const probeState = await ctx
+      .tab()
+      .probe!.call<{ connected: boolean }>(frame, objectId, 'state')
+      .catch(() => ({ connected: false }));
     if (probeState.connected) {
       record.print.role = live.role;
       record.print.name = live.name;

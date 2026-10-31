@@ -203,25 +203,40 @@ export function enrichFrame(
     if (insideActionable(node) && !isNativeControl(node) && !existing?.name) continue;
 
     // Prune out large layout containers (divs, sections, headers, banners) that are not atomic controls
-    const isContainerTag = ['div', 'section', 'header', 'nav', 'main', 'article', 'aside', 'footer', 'ul', 'ol', 'form'].includes(node.tag);
-    const hasAriaInteractive = ['button', 'link', 'radio', 'checkbox', 'tab', 'menuitem'].includes(node.attrs.role ?? '');
+    const isContainerTag = [
+      'div',
+      'section',
+      'header',
+      'nav',
+      'main',
+      'article',
+      'aside',
+      'footer',
+      'ul',
+      'ol',
+      'form',
+    ].includes(node.tag);
+    const hasAriaInteractive = ['button', 'link', 'radio', 'checkbox', 'tab', 'menuitem'].includes(
+      node.attrs.role ?? '',
+    );
     if (isContainerTag && !hasAriaInteractive && !node.scrollable) {
       const textLen = (doc.text(node.index) || '').length;
       if (textLen > 35) continue;
     }
 
     const digest = doc.digest(node.index);
-    const name = isRadioOrCheck && findOptionLabel(doc, node)
-      ? findOptionLabel(doc, node)!
-      : holdsValue(node)
-      ? node.attrs['aria-label'] ||
-        labelsOf(doc, node)
-          .map(l => doc.text(l.index))
-          .join(' ')
-          .trim() ||
-        node.attrs.title ||
-        ''
-      : doc.text(node.index) || node.attrs['aria-label'] || node.attrs.title || '';
+    const name =
+      isRadioOrCheck && findOptionLabel(doc, node)
+        ? findOptionLabel(doc, node)!
+        : holdsValue(node)
+          ? node.attrs['aria-label'] ||
+            labelsOf(doc, node)
+              .map(l => doc.text(l.index))
+              .join(' ')
+              .trim() ||
+            node.attrs.title ||
+            ''
+          : doc.text(node.index) || node.attrs['aria-label'] || node.attrs.title || '';
 
     if (existing && existing.kind === 'element') {
       // An outline node without a ref (for example a named group) becomes actionable in place.
@@ -232,7 +247,7 @@ export function enrichFrame(
       splice(node, {
         kind: 'element',
         rawRole: `layout:${node.tag}`,
-        role: isRadioOrCheck ? (node.attrs.type || node.attrs.role || 'radio') : layoutRole(node, signal),
+        role: isRadioOrCheck ? node.attrs.type || node.attrs.role || 'radio' : layoutRole(node, signal),
         name,
         states: [],
         actionable: true,

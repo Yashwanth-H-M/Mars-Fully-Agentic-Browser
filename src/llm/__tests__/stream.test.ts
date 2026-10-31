@@ -191,13 +191,19 @@ describe('the limit per local server', () => {
     expect(res4[0].input).toEqual({ url: 'https://www.youtube.com' });
 
     // Bare snapshot as emitted by qwen2.5-coder in latest screenshot
-    const res5 = extractToolCallsFromText('snapshot', { ...testTools, snapshot: { description: 'snap', parameters: {} } });
+    const res5 = extractToolCallsFromText('snapshot', {
+      ...testTools,
+      snapshot: { description: 'snap', parameters: {} },
+    });
     expect(res5).toHaveLength(1);
     expect(res5[0].toolName).toBe('snapshot');
     expect(res5[0].input).toEqual({});
 
     // Bare snapshot with backticks
-    const res6 = extractToolCallsFromText('`snapshot`', { ...testTools, snapshot: { description: 'snap', parameters: {} } });
+    const res6 = extractToolCallsFromText('`snapshot`', {
+      ...testTools,
+      snapshot: { description: 'snap', parameters: {} },
+    });
     expect(res6).toHaveLength(1);
     expect(res6[0].toolName).toBe('snapshot');
 

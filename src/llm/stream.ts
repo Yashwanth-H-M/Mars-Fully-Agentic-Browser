@@ -100,7 +100,8 @@ export function toToolSet(tools: Record<string, ToolDefinition>): ToolSet {
 }
 
 export function normalizeToolInput(toolName: string, raw: unknown): Record<string, unknown> {
-  const input = typeof raw === 'object' && raw !== null && !Array.isArray(raw) ? { ...(raw as Record<string, unknown>) } : {};
+  const input =
+    typeof raw === 'object' && raw !== null && !Array.isArray(raw) ? { ...(raw as Record<string, unknown>) } : {};
   if (typeof raw === 'string') {
     if (toolName === 'navigate') return { url: raw };
     if (toolName === 'click' || toolName === 'read' || toolName === 'hover') return { target: { ref: raw } };
@@ -210,7 +211,8 @@ export function extractToolCallsFromText(rawText: string, tools: Record<string, 
     }
     if (typeof obj !== 'object') return false;
     const record = obj as Record<string, unknown>;
-    const funcRecord = (record.function && typeof record.function === 'object' ? record.function : undefined) as Record<string, unknown> | undefined;
+    const funcRecord = (record.function && typeof record.function === 'object' ? record.function : undefined) as
+      Record<string, unknown> | undefined;
     const name = record.name || funcRecord?.name || record.tool;
     let args = record.arguments || funcRecord?.arguments || record.args || record.parameters || {};
     if (typeof args === 'string') {
@@ -243,7 +245,11 @@ export function extractToolCallsFromText(rawText: string, tools: Record<string, 
   }
 
   // 2. Direct JSON or code block
-  const stripped = text.trim().replace(/^```(?:json|javascript|js|python|py)?\s*/i, '').replace(/\s*```$/, '').trim();
+  const stripped = text
+    .trim()
+    .replace(/^```(?:json|javascript|js|python|py)?\s*/i, '')
+    .replace(/\s*```$/, '')
+    .trim();
   const directParsed = parseRelaxedJson(stripped);
   if (directParsed && tryAdd(directParsed)) return results;
 
@@ -347,7 +353,9 @@ export function extractToolCallsFromText(rawText: string, tools: Record<string, 
   }
 
   if (known.has('navigate')) {
-    const navMatch = /(?:navigate(?:\s+to)?|goto|open|url:?)\s*[:=]?\s*[`"'(«]?\s*(https?:\/\/[^\s`"'»)\],]+)/i.exec(text);
+    const navMatch = /(?:navigate(?:\s+to)?|goto|open|url:?)\s*[:=]?\s*[`"'(«]?\s*(https?:\/\/[^\s`"'»)\],]+)/i.exec(
+      text,
+    );
     if (navMatch) {
       results.push({
         toolCallId: `call_${Math.random().toString(36).slice(2, 10)}`,
