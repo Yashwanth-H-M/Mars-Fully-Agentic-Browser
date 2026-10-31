@@ -170,8 +170,10 @@ export interface ProbeApi {
   selectOption(el: Element, values: string[]): OptionResult;
   selectedOptions(el: Element): SelectedOption[];
   selectContents(el: Element): boolean;
+  isEditor?(el: Element): boolean;
   watchBlock(el: Element): string;
   blockMutations(): number;
+  unwatchBlock?(): void;
   hasText(text: string): boolean;
   navigationTarget(el: Element, mode: 'activate' | 'enter'): NavigationTarget | null;
   focused(): Element | null;
@@ -470,7 +472,13 @@ export function probeMain(): void {
           while (a && a.shadowRoot && a.shadowRoot.activeElement) a = a.shadowRoot.activeElement;
           // Closed roots hide their active element from shadowRoot; compare through the target's own root too.
           const own = el.getRootNode() as Document | ShadowRoot;
-          return a === el || own.activeElement === el;
+          const direct = a === el || own.activeElement === el;
+          if (direct) return true;
+          if (a && el.contains(a)) return true;
+          const EDITOR_SEL =
+            '.monaco-editor, .CodeMirror, .cm-editor, .cm-scroller, .cm-content, .ace_editor, [data-mode-id]';
+          const elEditor = el.closest(EDITOR_SEL);
+          return Boolean(elEditor && a && elEditor === a.closest(EDITOR_SEL));
         })(),
       };
     },
@@ -595,6 +603,11 @@ export function probeMain(): void {
 
     blockMutations() {
       return blockCount;
+    },
+
+    unwatchBlock() {
+      blockObserver?.disconnect();
+      blockObserver = null;
     },
 
     /**
@@ -809,8 +822,24 @@ export function probeMain(): void {
       return norm(document.body?.innerText ?? '').includes(norm(text));
     },
 
+    isEditor(el: Element) {
+      const EDITOR_SEL =
+        '.monaco-editor, .CodeMirror, .cm-editor, .cm-scroller, .cm-content, .ace_editor, [data-mode-id], [class*="monaco-"], [class*="CodeMirror"], [class*="ace_"], [class*="code-editor"]';
+      return !!el.closest(EDITOR_SEL);
+    },
+
     /** Selects the whole content of a focused field or editor, so the next insertion replaces it. */
     selectContents(el: Element) {
+      const EDITOR_SEL =
+        '.monaco-editor, .CodeMirror, .cm-editor, .cm-scroller, .cm-content, .ace_editor, [data-mode-id]';
+      if (el.closest(EDITOR_SEL)) {
+        try {
+          document.execCommand('selectAll');
+          return true;
+        } catch {
+          // fallback
+        }
+      }
       const tag = el.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA') {
         try {
@@ -874,6 +903,40 @@ export function probeMain(): void {
 
     /** The hit rule: whether a hit-test result counts as a hit on the target. */
     hitAccepts(target: Element, hit: Node) {
+      // 1. Code editors and composite editor components (Monaco, CodeMirror, Ace):
+      // The visual lines, scrollable elements, gutters and overlays are the visual presentation of the editor.
+      const EDITOR_SEL =
+        '.monaco-editor, .CodeMirror, .cm-editor, .cm-scroller, .cm-content, .ace_editor, [data-mode-id], [class*="monaco-"], [class*="monaco_"], [class*="CodeMirror"], [class*="cm-"], [class*="ace_"], [class*="code-editor"], [class*="CodeEditor"], [class*="editor-container"], [role="code"], [data-editor]';
+      const targetEditor = target.closest(EDITOR_SEL);
+      const hitEl = hit.nodeType === 1 ? (hit as Element) : hit.parentElement;
+      const hitEditor = hitEl?.closest(EDITOR_SEL);
+      if (
+        targetEditor &&
+        hitEditor &&
+        (targetEditor === hitEditor || targetEditor.contains(hitEditor) || hitEditor.contains(targetEditor))
+      ) {
+        return { accepted: true, kind: 'inside' as const };
+      }
+
+      // 2. Custom text entry and editor wrappers:
+      // When target is an input/textarea/editable element, clicking within the same editor/field container
+      // (except on separate buttons/links) delegates focus to the input.
+      const isTextEntry =
+        target.tagName === 'TEXTAREA' ||
+        target.tagName === 'INPUT' ||
+        (target as HTMLElement).isContentEditable === true ||
+        target.getAttribute('role') === 'textbox';
+      if (isTextEntry && hitEl) {
+        const commonWrapper = target.closest(
+          '[class*="editor" i], [class*="Editor" i], [class*="input" i], [class*="field" i], [class*="code" i], [class*="Code" i], form, section, main, article',
+        );
+        if (commonWrapper && commonWrapper.contains(hitEl)) {
+          if (!hitEl.matches('button, a[href], [role="button"], [role="link"]')) {
+            return { accepted: true, kind: 'inside' as const };
+          }
+        }
+      }
+
       // A hit inside the target is accepted unless it is on a separate control inside it: that control would take
       // the click, and nobody classified it.
       let nested: Element | null = null;
@@ -914,9 +977,22 @@ export function probeMain(): void {
     armGuard(target: Element, mode: 'pointer' | 'text', lifetimeMs = 4000, unfocused = false) {
       guard?.remove();
       const roots = rootsOf(target);
+      const EDITOR_SEL =
+        '.monaco-editor, .CodeMirror, .cm-editor, .cm-scroller, .cm-content, .ace_editor, [data-mode-id], [class*="monaco-"], [class*="monaco_"], [class*="CodeMirror"], [class*="cm-"], [class*="ace_"], [class*="code-editor"], [class*="CodeEditor"], [class*="editor-container"], [role="code"], [data-editor]';
+      const targetEditor = target.closest(EDITOR_SEL);
       // The document guard's target is the body: no focused element at all also counts as the body.
       const accepts = (hit: Element | null) =>
-        hit === target || (unfocused && (!hit || hit === document.documentElement));
+        hit === target ||
+        (hit !== null && target.contains(hit)) ||
+        (hit !== null &&
+          hit.contains(target) &&
+          (target.tagName === 'TEXTAREA' ||
+            target.tagName === 'INPUT' ||
+            (target as HTMLElement).isContentEditable)) ||
+        (hit !== null &&
+          targetEditor !== null &&
+          (targetEditor === hit.closest(EDITOR_SEL) || targetEditor.contains(hit))) ||
+        (unfocused && (!hit || hit === document.documentElement));
       const report: GuardReport =
         mode === 'text'
           ? { verdict: 'none', hit: '', seen: [], accepted: 0, strayKeyups: 0 }

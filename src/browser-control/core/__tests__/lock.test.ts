@@ -42,4 +42,18 @@ describe('TabLocks (no overlapping dispatch on a tab)', () => {
     expect(locks.isBusy(1)).toBe(false);
     await expect(locks.run(1, async () => 'next')).resolves.toBe('next');
   });
+
+  it('does not deadlock when an earlier queued operation fails', async () => {
+    const locks = new TabLocks();
+    const p1 = locks.run(1, async () => {
+      await tick(10);
+      throw new Error('fail');
+    });
+    const p2 = locks.run(1, async () => {
+      return 'recovered';
+    });
+    await expect(p1).rejects.toThrow('fail');
+    await expect(p2).resolves.toBe('recovered');
+    expect(locks.isBusy(1)).toBe(false);
+  });
 });

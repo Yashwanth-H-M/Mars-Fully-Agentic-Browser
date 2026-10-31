@@ -715,11 +715,9 @@ export function quote(s: string, max = MAX_TEXT): string {
 }
 
 export function renderLine(n: ONode): string {
-  const box = n.box ? ` [box: ${Math.round(n.box[0])},${Math.round(n.box[1])},${Math.round(n.box[2])}x${Math.round(n.box[3])}]` : '';
-  if (n.kind === 'text') return `text ${quote(n.name)}${box}`;
+  if (n.kind === 'text') return `text ${quote(n.name)}`;
   let line = n.ref ? `[${n.ref}] ${n.role}` : n.role;
   if (n.name) line += ` ${quote(n.name)}`;
-  line += box;
   if (n.states.length) line += ` (${n.states.join(', ')})`;
   if (n.value !== undefined) line += ` = ${n.masked ? `"${MASK}" (masked)` : quote(n.value, 200)}`;
   if (n.site) line += ` (site ${n.site})`;

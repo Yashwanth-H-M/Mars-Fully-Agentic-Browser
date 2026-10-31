@@ -103,7 +103,7 @@ describe('a selection', () => {
     const part = parts[0] as { text: string; attached: { kind: string } };
     expect(part.attached.kind).toBe('selection');
     expect(part.text).toBe(
-      '[Nanobrowser note: the user selected this text on the page «Kettle sale» («https://shop.example/kettle?id=1»).]\n<<<page-content N site=shop.example>>>\nKettle: 49.90\n<<<end-page-content N>>>',
+      '[Mars note: the user selected this text on the page «Kettle sale» («https://shop.example/kettle?id=1»).]\n<<<page-content N site=shop.example>>>\nKettle: 49.90\n<<<end-page-content N>>>',
     );
   });
 });

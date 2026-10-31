@@ -97,7 +97,7 @@ export function ProvidersSection() {
 
   const choices = providers.flatMap(p =>
     p.models
-      .filter(m => !m.noToolCalling || p.kind === 'ollama')
+      .filter(m => !m.noToolCalling || p.kind === 'ollama' || p.kind === 'lmstudio')
       .map(m => ({ value: `${p.id}\u0000${m.name}`, label: `${p.name} · ${m.name}` })),
   );
   const current = settings.defaultModel

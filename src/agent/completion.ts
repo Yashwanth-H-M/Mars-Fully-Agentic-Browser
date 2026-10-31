@@ -37,6 +37,8 @@ export function debtLabel(tool: string, result: Result | undefined, tabId: numbe
 /** Whether a later result on the tab is evidence of its state after the action. */
 export function clearsDebt(tool: string, result: Result, item: DebtEntry): boolean {
   if (!result.ok || result.pageError) return false;
+  // If an action verified its postcondition, clear debt immediately
+  if (result.receipt?.postcondition?.status === 'met') return true;
   const page = result.page;
   if (['snapshot', 'find', 'read', 'screenshot'].includes(tool)) {
     // A read of the same tab that succeeds takes a new capture after any dispatched action.
@@ -54,7 +56,7 @@ export function clearsDebt(tool: string, result: Result, item: DebtEntry): boole
   ) {
     return true;
   }
-  return result.receipt?.postcondition?.status === 'met' && page?.tabId === item.tabId;
+  return false;
 }
 
 /** The refusal of done(success) while debt is left. */

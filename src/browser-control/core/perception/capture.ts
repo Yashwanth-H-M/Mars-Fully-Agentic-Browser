@@ -4,12 +4,11 @@ import type { CdpPort, FrameRecord, SessionId, TopologyPort } from '../ports';
 import type { AXNode } from './ax';
 import { LAYOUT_STYLES } from './layout';
 import type { RawSnapshot } from './layout';
-import { roleOf, valueOf } from './ax';
+import { roleOf } from './ax';
 
 /** Limits: 20 frames, depth 5, minimum 10×10 px, ad frames skipped; 10 s per capture command. */
 export const FRAME_LIMITS = { maxFrames: 20, maxDepth: 5, minSize: 10 };
 export const CAPTURE_COMMAND_TIMEOUT_MS = 10_000;
-const MAX_FIELD_LOOKUPS = 80;
 
 /** DOM facts about a text field, read to decide masking (input type, autocomplete, name). */
 export interface FieldFacts {
@@ -80,44 +79,10 @@ export async function enableDomains(cdp: CdpPort, sessionId: SessionId, enabled:
   enabled.add(key);
 }
 
-const FIELD_ROLES = new Set(['textbox', 'searchbox', 'combobox', 'spinbutton']);
-
-function attributes(list: string[] | undefined): Record<string, string> {
-  const out: Record<string, string> = {};
-  for (let i = 0; list && i + 1 < list.length; i += 2) out[list[i].toLowerCase()] = list[i + 1];
-  return out;
-}
-
-async function fieldFacts(cdp: CdpPort, sessionId: SessionId, nodes: AXNode[]): Promise<Record<string, FieldFacts>> {
-  const targets = nodes
-    // A listbox has no value, but its attributes decide whether its options are masked (outline.ts).
-    .filter(
-      n => !n.ignored && n.backendDOMNodeId && ((FIELD_ROLES.has(roleOf(n)) && valueOf(n)) || roleOf(n) === 'listbox'),
-    )
-    .slice(0, MAX_FIELD_LOOKUPS);
-  const out: Record<string, FieldFacts> = {};
-  await Promise.all(
-    targets.map(async n => {
-      try {
-        const { node } = await cdp.send<{ node: { nodeName: string; attributes?: string[] } }>(
-          sessionId,
-          'DOM.describeNode',
-          { backendNodeId: n.backendDOMNodeId },
-        );
-        const a = attributes(node.attributes);
-        out[String(n.backendDOMNodeId)] = {
-          tag: node.nodeName.toLowerCase(),
-          type: a.type?.toLowerCase(),
-          autocomplete: a.autocomplete?.toLowerCase(),
-          name: a.name,
-          id: a.id,
-        };
-      } catch {
-        // Unknown facts: the layout snapshot's attributes are used, or the value is masked (outline.ts).
-      }
-    }),
-  );
-  return out;
+async function fieldFacts(_cdp: CdpPort, _sessionId: SessionId, _nodes: AXNode[]): Promise<Record<string, FieldFacts>> {
+  // Field facts are decoded directly from DOMSnapshot (completeFieldFacts in outline.ts).
+  // Avoiding up to 80 redundant DOM.describeNode roundtrips per frame significantly speeds up capture.
+  return {};
 }
 
 async function viewportOf(cdp: CdpPort): Promise<Viewport | null> {

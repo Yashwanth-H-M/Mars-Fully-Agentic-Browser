@@ -36,7 +36,7 @@ describe('createStorage', () => {
   it('merges stored settings over the defaults', () => {
     expect(mergeSettings(undefined)).toEqual(DEFAULT_SETTINGS);
     expect(mergeSettings({ turnCap: 7 }).turnCap).toBe(7);
-    expect(mergeSettings({ turnCap: 7 }).defaultMode).toBe('ask');
+    expect(mergeSettings({ turnCap: 7 }).defaultMode).toBe('auto');
   });
 });
 

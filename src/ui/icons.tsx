@@ -220,7 +220,7 @@ export function LogoMark({ size = 20, className = '' }: { size?: number; classNa
 /** The brand's horizontal logo: the Mars mark and "Mars". */
 export function Logo({ height = 28, className = '' }: { height?: number; className?: string }) {
   return (
-    <div className={`inline-flex items-center gap-2.5 font-bold tracking-tight select-none ${className}`}>
+    <div className={`inline-flex select-none items-center gap-2.5 font-bold tracking-tight ${className}`}>
       <img
         src="/icon-128.png"
         alt="Mars"

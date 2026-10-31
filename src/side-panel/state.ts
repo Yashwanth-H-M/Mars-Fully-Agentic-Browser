@@ -63,12 +63,25 @@ function upsert(entries: DisplayEntry[], entry: DisplayEntry): DisplayEntry[] {
 }
 
 function updateRow(entries: DisplayEntry[], messageId: string, row: ToolRow): DisplayEntry[] {
-  return entries.map(e => {
+  let found = false;
+  const next = entries.map(e => {
     if (e.kind !== 'assistant' || e.id !== messageId) return e;
+    found = true;
     const i = e.tools.findIndex(r => r.toolCallId === row.toolCallId);
     const tools = i < 0 ? [...e.tools, row] : e.tools.map((r, j) => (j === i ? { ...r, ...row } : r));
     return { ...e, tools };
   });
+  if (found) return next;
+  return [
+    ...entries,
+    {
+      kind: 'assistant',
+      id: messageId,
+      text: '',
+      at: new Date().toISOString(),
+      tools: [row],
+    },
+  ];
 }
 
 export function reduce(state: PanelState, event: PanelEvent): PanelState {

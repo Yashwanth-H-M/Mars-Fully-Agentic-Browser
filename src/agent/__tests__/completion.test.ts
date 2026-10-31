@@ -205,8 +205,8 @@ describe('guards', () => {
     const layer = new FakeLayer({ find: () => ok('nothing') });
     const same = (id: string) => ({ toolCalls: [call('find', { name: 'Checkout' }, id)] });
     const { texts } = await run([same('a'), same('b'), same('c'), { text: 'Not found.' }], layer);
-    expect(texts.b).not.toMatch(/Nanobrowser note/);
-    expect(texts.c).toMatch(/\[Nanobrowser note: you made the same call with the same outcome 3 times/);
+    expect(texts.b).not.toMatch(/(?:Nanobrowser|Mars) note/);
+    expect(texts.c).toMatch(/\[(?:Nanobrowser|Mars) note: you made the same call with the same outcome 3 times/);
   });
 
   it('nudges at two no-effect actions on a target, stops at three, and salvages with done', async () => {

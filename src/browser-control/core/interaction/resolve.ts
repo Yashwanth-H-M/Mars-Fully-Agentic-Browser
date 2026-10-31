@@ -72,7 +72,29 @@ async function resolveSemantic(
   walk(roots, n => {
     if (!n.ref) return;
     if (role && role !== 'text' && n.role.toLowerCase() !== role && n.rawRole.toLowerCase() !== role) return;
-    if (name !== undefined && n.name !== name && !n.name.includes(name)) return;
+    if (name !== undefined) {
+      const cleanNodeName = (n.name ?? '').trim().toLowerCase();
+      const targetQuery = name.trim().toLowerCase();
+      const isControl = ['radio', 'checkbox', 'button', 'option', 'menuitemradio', 'menuitemcheckbox', 'link'].includes(n.role.toLowerCase());
+      if (cleanNodeName === targetQuery) {
+        matches.push(n);
+        return;
+      }
+      // If query is short (e.g. "2" or "18"), do not match layout containers or non-interactive divs
+      if (targetQuery.length <= 5 && !isControl) return;
+      if (targetQuery.length <= 5 && cleanNodeName.length > 20) return;
+      // Word boundary match:
+      const wordRegex = new RegExp(`(^|\\s|[.,;:-])${targetQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}($|\\s|[.,;:-])`, 'i');
+      if (wordRegex.test(cleanNodeName)) {
+        matches.push(n);
+        return;
+      }
+      if (cleanNodeName.includes(targetQuery) && cleanNodeName.length < 50 && isControl) {
+        matches.push(n);
+        return;
+      }
+      return;
+    }
     matches.push(n);
   });
   const label = `${target.role ?? 'element'}${name !== undefined ? ` ${quote(name)}` : ''}`;
@@ -96,9 +118,26 @@ async function resolveSemantic(
     return asShown(ctx, observation, pick.ref!);
   }
   if (matches.length > 1) {
-    const exact = name !== undefined ? matches.filter(m => m.name === name) : matches;
+    const radios = matches.filter(m => ['radio', 'checkbox', 'menuitemradio'].includes(m.role.toLowerCase()));
+    if (radios.length === 1) {
+      return asShown(ctx, observation, radios[0].ref!);
+    }
+    const interactive = matches.filter(m =>
+      ['radio', 'checkbox', 'button', 'option', 'menuitemradio', 'menuitemcheckbox'].includes(m.role.toLowerCase()),
+    );
+    if (interactive.length === 1) {
+      return asShown(ctx, observation, interactive[0].ref!);
+    }
+    const exact =
+      name !== undefined
+        ? matches.filter(m => (m.name ?? '').trim().toLowerCase() === name.trim().toLowerCase())
+        : matches;
     if (exact.length === 1) {
       return asShown(ctx, observation, exact[0].ref!);
+    }
+    const exactRadios = exact.filter(m => ['radio', 'checkbox'].includes(m.role.toLowerCase()));
+    if (exactRadios.length === 1) {
+      return asShown(ctx, observation, exactRadios[0].ref!);
     }
     const list = matches.slice(0, 10).map(m => `[${m.ref}] ${m.role} ${quote(m.name, 60)}`);
     throw new LayerError(
@@ -230,7 +269,13 @@ async function resolveByText(ctx: ToolContext, text: string, nth = 0): Promise<R
             if (!s) return false;
             const c = clean(s).toLowerCase();
             const n = norm(s);
-            return c === target || n === normTarget || (normTarget.length > 1 && n.includes(normTarget));
+            if (c === target || n === normTarget) return true;
+            if (target.length <= 4) {
+              // Word boundary for short queries to prevent matching inside long unrelated words/numbers
+              const re = new RegExp('(^|\\\\s|[.,;:-])' + target.replace(/[.*+?^$\\{\\}()|[\\]\\\\]/g, '\\\\$&') + '($|\\\\s|[.,;:-])');
+              return re.test(c);
+            }
+            return c.includes(target) || n.includes(normTarget);
           };
 
           // 1. Labels with matching text
@@ -243,10 +288,21 @@ async function resolveByText(ctx: ToolContext, text: string, nth = 0): Promise<R
             }
           }
 
-          // 2. Radio buttons, checkboxes, buttons, options near or containing matching text
-          const inputs = Array.from(document.querySelectorAll('input, button, [role="radio"], [role="checkbox"], [role="button"], [role="option"]'));
+          // 2. Radio buttons & checkboxes near or containing matching text
+          const radios = Array.from(document.querySelectorAll('input[type="radio"], input[type="checkbox"], [role="radio"], [role="checkbox"]'));
+          for (const r of radios) {
+            if (matchesTarget(r.value) || matchesTarget(r.getAttribute('aria-label'))) return r;
+            let cur = r.parentElement;
+            for (let d = 0; d < 4 && cur && cur !== document.body; d++) {
+              if (matchesTarget(cur.innerText || cur.textContent)) return r;
+              cur = cur.parentElement;
+            }
+          }
+
+          // 3. Other interactive inputs/buttons
+          const inputs = Array.from(document.querySelectorAll('input, button, [role="button"], [role="option"]'));
           for (const el of inputs) {
-            if (matchesTarget(el.value) || matchesTarget(el.getAttribute('aria-label'))) {
+            if (matchesTarget(el.value) || matchesTarget(el.getAttribute('aria-label')) || matchesTarget(el.innerText || el.textContent)) {
               return el;
             }
             const parent = el.closest('label') || el.closest('li') || el.parentElement;
@@ -255,7 +311,7 @@ async function resolveByText(ctx: ToolContext, text: string, nth = 0): Promise<R
             }
           }
 
-          // 3. Elements with exact text match (prefer leaf elements)
+          // 4. Exact leaf text elements (prefer radio nearby)
           const all = Array.from(document.querySelectorAll('span, p, div, label, li, td, th, a, button, input'));
           const exact = [];
           for (const el of all) {
@@ -266,9 +322,13 @@ async function resolveByText(ctx: ToolContext, text: string, nth = 0): Promise<R
           if (exact.length > 0) {
             exact.sort((a, b) => a.children.length - b.children.length || (a.textContent || '').length - (b.textContent || '').length);
             const pick = exact[${nth}] || exact[0];
-            const parent = pick.closest('label') || pick.parentElement;
-            const radio = parent ? parent.querySelector('input[type="radio"], input[type="checkbox"]') : null;
-            return radio || pick;
+            let cur = pick;
+            for (let d = 0; d < 4 && cur && cur !== document.body; d++) {
+              const nearbyRadio = cur.querySelector('input[type="radio"], input[type="checkbox"], [role="radio"], [role="checkbox"]');
+              if (nearbyRadio) return nearbyRadio;
+              cur = cur.parentElement;
+            }
+            return pick;
           }
 
           // 4. Substring text match in leaf elements
@@ -489,7 +549,7 @@ async function revalidate(
   frame: FrameRecord,
   record: RefRecord,
   objectId: string,
-  strict = false,
+  _strict = false,
 ): Promise<void> {
   if (record.source === 'layout') {
     // Refs found by layout signals: the tag, the text digest and the other sources of the name (aria-label, title,

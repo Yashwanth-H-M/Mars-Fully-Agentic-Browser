@@ -59,8 +59,8 @@ afterEach(async () => {
 });
 
 describe('settings', () => {
-  it('gives Medium to stored settings without the field', () => {
-    expect(mergeSettings({ defaultMode: 'auto' }).reasoning).toBe('medium');
+  it('gives None to stored settings without the field', () => {
+    expect(mergeSettings({ defaultMode: 'auto' }).reasoning).toBe('none');
     expect(mergeSettings({ reasoning: 'high' }).reasoning).toBe('high');
   });
 

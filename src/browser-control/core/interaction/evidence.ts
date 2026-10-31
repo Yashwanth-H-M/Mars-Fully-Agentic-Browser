@@ -12,8 +12,8 @@ import { isSensitiveState } from '../perception/masking';
 import { dialogDetail, quote } from '../text';
 import { siteOf } from '../site';
 
-/** Settle: poll 30 ms; cap 600 ms; check immediately at t=0 before sleeping. */
-const POLL_MS = 30;
+/** Settle: poll 20 ms; cap 600 ms; check immediately at t=0 before sleeping. */
+const POLL_MS = 20;
 const CAP_MS = 600;
 const NAVIGATION_READY_MS = 3_000;
 /** How long the block is watched after settle when the only evidence is its own mutations. */
@@ -260,11 +260,16 @@ export class Evidence {
         const now = await this.#snapshot();
         const signals = this.#signals(now);
         const key = JSON.stringify(signals.map(s => s.replace(' (pending)', '')));
-        const inflight = [...this.#requests.values()].some(r => !r.done);
+        const inflight = [...this.#requests.values()].some(
+          r => !r.done && !/(analytics|telemetry|collect|beacon|pixel|log|metrics|ping)/i.test(r.url),
+        );
         const elapsed = performance.now() - start;
         if (elapsed >= CAP_MS) break;
         // With an explicit expectation, settle waits for it up to the cap instead of stopping on quiet evidence.
-        if (!expect && !inflight && key === previous) break;
+        if (!expect && !inflight && key === previous) {
+          // If signals were observed or elapsed >= 40ms, early exit immediately
+          if (signals.length > 0 || elapsed >= 40) break;
+        }
         previous = key;
       }
       // The page cannot be read: a dialog blocks its renderer (every read would only time out), or the action closed
@@ -383,6 +388,12 @@ export class Evidence {
   dispose(): void {
     this.#offs.forEach(off => off());
     this.#offs = [];
+    if (this.target && this.ctx.tab().probe) {
+      this.ctx
+        .tab()
+        .probe!.callGlobal(this.target.frame, 'unwatchBlock')
+        .catch(() => undefined);
+    }
   }
 }
 

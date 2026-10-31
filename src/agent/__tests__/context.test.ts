@@ -123,8 +123,7 @@ describe('toModelMessages', () => {
     });
     const list = {
       type: 'text' as const,
-      text: '[Nanobrowser note: files attached to this message: ...]',
-      attached: { kind: 'file' as const, label: 'all files' },
+      text: '[Mars note: files attached to this message: ...]',
     };
     const files = [text('old.md'), ...Array.from({ length: MAX_FILES - 1 }, (_, i) => img(`file${i}`))];
     const branch: Entry[] = [

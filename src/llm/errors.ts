@@ -39,7 +39,7 @@ export function isRetryable(error: unknown): boolean {
     if (status === undefined) return unwrapped.isRetryable;
     return status === 408 || status === 409 || status === 429 || status >= 500;
   }
-  const anyErr = unwrapped as any;
+  const anyErr = unwrapped as { status?: number; statusCode?: number; message?: string } | undefined;
   const status = typeof anyErr?.status === 'number' ? anyErr.status : typeof anyErr?.statusCode === 'number' ? anyErr.statusCode : undefined;
   if (status !== undefined) {
     return status === 408 || status === 409 || status === 429 || status >= 500;
@@ -55,10 +55,14 @@ export function isRetryable(error: unknown): boolean {
 /** The delay a `Retry-After` (seconds or a date) or `retry-after-ms` header asks for, in milliseconds. */
 export function retryAfterMs(error: unknown, now = Date.now()): number | undefined {
   const unwrapped = unwrapError(error);
-  const anyErr = unwrapped as any;
+  const anyErr = unwrapped as {
+    responseHeaders?: Record<string, string> | Headers;
+    headers?: Record<string, string> | Headers;
+    message?: string;
+  } | undefined;
   const headers = (APICallError.isInstance(unwrapped) ? unwrapped.responseHeaders : anyErr?.responseHeaders ?? anyErr?.headers) ?? {};
   const get = (name: string) => {
-    if (typeof headers.get === 'function') return headers.get(name);
+    if (typeof (headers as Headers).get === 'function') return (headers as Headers).get(name);
     return Object.entries(headers).find(([k]) => k.toLowerCase() === name)?.[1];
   };
   const ms = Number(get('retry-after-ms'));
@@ -71,7 +75,7 @@ export function retryAfterMs(error: unknown, now = Date.now()): number | undefin
     if (Number.isFinite(date)) return Math.max(0, date - now);
   }
   // Fall back to message parsing e.g. "Please retry after 2.5s" or "retry in 3s"
-  const msgMatch = /retry (?:after|in)\s+([\d\.]+)\s*s/i.exec(String(anyErr?.message ?? ''));
+  const msgMatch = /retry (?:after|in)\s+([\d.]+)\s*s/i.exec(String(anyErr?.message ?? ''));
   if (msgMatch) {
     const s = Number(msgMatch[1]);
     if (Number.isFinite(s) && s > 0) return Math.max(0, Math.round(s * 1000));

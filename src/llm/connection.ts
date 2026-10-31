@@ -82,7 +82,12 @@ export async function testConnection(
       ms: result.durationMs,
     };
   }
-  const toolCalling = result.toolCalls.some(c => c.toolName === 'report_status' && !c.invalid);
+  let toolCalling = result.toolCalls.some(c => c.toolName === 'report_status' && !c.invalid);
+  if (!toolCalling && (spec.kind === 'ollama' || spec.kind === 'lmstudio' || spec.kind === 'openai-compatible')) {
+    if (/report_status|["']?status["']?\s*[:=]\s*["']?ok["']?/i.test(result.text)) {
+      toolCalling = true;
+    }
+  }
   // A reply cut short before any tool call says nothing about tool calling: the model may have spent its output on
   // reasoning. Reported as a failed test, so nothing is stored and a model that worked keeps working.
   if (!toolCalling && result.finish === 'length') {

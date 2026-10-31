@@ -107,9 +107,10 @@ function generateNotepadLog(state: typeof INITIAL): string {
             lines.push(`       Observation/Text: ${tool.text.split('\n')[0]}`);
           }
           if (tool.result) {
-            const resObj = tool.result as Record<string, any>;
-            if (resObj?.error) {
-              lines.push(`       Error: [${resObj.error.code}] ${resObj.error.message || ''}`);
+            const resObj = tool.result as Record<string, unknown>;
+            const err = resObj?.error as { code?: string; message?: string } | undefined;
+            if (err) {
+              lines.push(`       Error: [${err.code ?? ''}] ${err.message || ''}`);
             }
           }
         }
@@ -266,7 +267,7 @@ export function App() {
     () =>
       providers.flatMap(p =>
         p.models
-          .filter(m => !m.noToolCalling || p.kind === 'ollama')
+          .filter(m => !m.noToolCalling || p.kind === 'ollama' || p.kind === 'lmstudio')
           .map(m => {
             const ref = { providerId: p.id, model: m.name };
             return { ref, label: `${m.name} · ${p.name}`, name: m.name, capability: capabilityOf(providers, ref) };

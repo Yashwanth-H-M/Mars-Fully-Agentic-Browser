@@ -2,7 +2,7 @@
 // activity block. Under a user's message, on hover: its time, Copy, Edit and Restart from here. Under an answer,
 // always: Copy and its time. Retry after an error. A new turn keeps the question in view; auto-scroll resumes only at
 // the bottom, with a jump-to-latest arrow otherwise.
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { AttachmentRef, DisplayEntry, ToolRow } from '@src/ui/protocol';
 import { runRows } from '@src/ui/protocol';
@@ -95,10 +95,10 @@ export function Transcript({
   useLayoutEffect(() => {
     const el = scroller.current;
     if (el && atBottom) el.scrollTop = el.scrollHeight;
-  });
+  }, [entries.length, streaming?.text, atBottom]);
 
   const now = useMinute();
-  const { items, floor } = group(entries);
+  const { items, floor } = useMemo(() => group(entries), [entries]);
   const lastItem = items.at(-1);
   const pending = streaming && !entries.some(e => e.id === streaming.id) ? streaming : null;
   // The working run's block is the last one; before its first reply, its status line stands alone.

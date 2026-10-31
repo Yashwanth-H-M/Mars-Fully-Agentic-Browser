@@ -39,9 +39,15 @@ export function modifierMask(modifiers: string[] | undefined): number {
 /** Resolves with the next JavaScript dialog on any session of the tab, until disposed. */
 export function watchDialog(cdp: CdpPort) {
   let resolveDialog!: (d: DialogInfo) => void;
-  const opened = new Promise<DialogInfo>(resolve => (resolveDialog = resolve));
+  let current: DialogInfo | undefined;
+  const opened = new Promise<DialogInfo>(resolve => {
+    resolveDialog = d => {
+      current = d;
+      resolve(d);
+    };
+  });
   const off = cdp.on('Page.javascriptDialogOpening', params => resolveDialog(params as DialogInfo));
-  return { opened, dispose: off };
+  return { opened, get current() { return current; }, dispose: off };
 }
 
 /** Sends one input command, raced against a dialog. A dialog that opens first wins; the command stays outstanding. */
@@ -222,7 +228,6 @@ export async function dispatchClick(
   const count = options.count ?? 1;
   tab.actionSeq++;
   let dispatched: boolean | 'unknown' = false;
-  let guardsRead = false;
   try {
     await cdp.send(undefined, 'Input.dispatchMouseEvent', {
       type: 'mouseMoved',
@@ -254,28 +259,9 @@ export async function dispatchClick(
         return { dispatched, dialog: opened };
       };
       if ('dialog' in press) return hold(press.dialog);
-      // The press ran the page's mousedown handlers, and the release is what clicks.
-      let during: DialogInfo | undefined;
-      try {
-        during = await unlessDialog(stillJudged(ctx, target, options.gate), dialog.opened);
-      } catch (error) {
-        // The button is down: it is released, with the release withheld from the page, so nothing is clicked.
-        const guards = await readGuards(ctx, target, ancestors).catch(() => null);
-        guardsRead = true;
-        await sendWithheld(tab, 'pointer', release).catch(() => false);
-        // A press the guard cancelled reached no handler: that, not the change, is what happened.
-        throw (
-          (guards && intercepted(target, guards, count)) ??
-          afterInput(
-            error,
-            true,
-            'The press was sent; its release was withheld from the page, so the click did not complete.',
-          )
-        );
-      }
-      if (during) return hold(during);
+      if (dialog.current) return hold(dialog.current);
       const released = await sendRaced(cdp, { ...base, type: 'mouseReleased', clickCount }, dialog.opened);
-      if ('dialog' in released) return { dispatched, dialog: released.dialog };
+      if ('dialog' in released) return hold(released.dialog);
     }
   } catch (error) {
     // A command that timed out cannot be cancelled: its outcome is unknown, and it is not sent again.
@@ -283,7 +269,7 @@ export async function dispatchClick(
       return { dispatched: 'unknown' };
     }
     // A sequence stopped by a check leaves no guard behind to cancel a later press.
-    if (!guardsRead && !tab.dialog) await readGuards(ctx, target, ancestors).catch(() => null);
+    if (!tab.dialog) await readGuards(ctx, target, ancestors).catch(() => null);
     throw error;
   } finally {
     dialog.dispose();

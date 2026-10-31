@@ -59,6 +59,8 @@ class ChromeCdpPort implements CdpPort {
 }
 
 export class ChromeTabConnection implements TabAttachment {
+  static openingConnections = new Map<number, Promise<ChromeTabConnection>>();
+
   readonly cdp: CdpPort;
   readonly topology: TopologyPort;
   readonly page: PagePort;
@@ -86,35 +88,47 @@ export class ChromeTabConnection implements TabAttachment {
     listen();
     const existing = connections.get(tabId);
     if (existing && !existing.detached) return existing;
-    const tab = await chrome.tabs.get(tabId).catch(() => null);
-    if (!tab) throw new LayerError('TAB_NOT_IN_SESSION', `Tab ${tabId} does not exist`);
-    if (isRestrictedUrl(tab.url ?? tab.pendingUrl ?? '')) {
-      throw new LayerError('PAGE_NOT_SUPPORTED', `Tab ${tabId} shows a page that cannot be controlled: ${tab.url}`);
-    }
-    let puppeteer: PuppeteerConnection;
-    try {
-      puppeteer = await connectTab(tabId).catch(async error => {
-        // This extension's debugger is still on the tab though no connection here knows it: the service worker
-        // restarted while the tab was attached. Detach it and attach again. Another client's debugger cannot be
-        // detached from here, and the second attempt then fails with the same error.
-        if (!/already attached/i.test(error instanceof Error ? error.message : String(error))) throw error;
-        await chrome.debugger.detach({ tabId }).catch(() => undefined);
-        return connectTab(tabId);
-      });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      if (/cannot access|cannot attach|chrome:\/\/|extensions gallery/i.test(message)) {
-        throw new LayerError('PAGE_NOT_SUPPORTED', `Cannot attach to tab ${tabId}: ${message}`);
+    const inflight = ChromeTabConnection.openingConnections.get(tabId);
+    if (inflight) return inflight;
+
+    const promise = (async () => {
+      try {
+        const tab = await chrome.tabs.get(tabId).catch(() => null);
+        if (!tab) throw new LayerError('TAB_NOT_IN_SESSION', `Tab ${tabId} does not exist`);
+        if (isRestrictedUrl(tab.url ?? tab.pendingUrl ?? '')) {
+          throw new LayerError('PAGE_NOT_SUPPORTED', `Tab ${tabId} shows a page that cannot be controlled: ${tab.url}`);
+        }
+        let puppeteer: PuppeteerConnection;
+        try {
+          puppeteer = await connectTab(tabId).catch(async error => {
+            // This extension's debugger is still on the tab though no connection here knows it: the service worker
+            // restarted while the tab was attached. Detach it and attach again. Another client's debugger cannot be
+            // detached from here, and the second attempt then fails with the same error.
+            if (!/already attached/i.test(error instanceof Error ? error.message : String(error))) throw error;
+            await chrome.debugger.detach({ tabId }).catch(() => undefined);
+            return connectTab(tabId);
+          });
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          if (/cannot access|cannot attach|chrome:\/\/|extensions gallery/i.test(message)) {
+            throw new LayerError('PAGE_NOT_SUPPORTED', `Cannot attach to tab ${tabId}: ${message}`);
+          }
+          throw new LayerError('INTERNAL', `Cannot attach to tab ${tabId}: ${message}`);
+        }
+        const connection = new ChromeTabConnection(tabId, puppeteer);
+        connections.set(tabId, connection);
+        // The operated tab may sit in a window the user is not in; keep the page behaving as focused.
+        await connection.cdp
+          .send(undefined, 'Emulation.setFocusEmulationEnabled', { enabled: true })
+          .catch(() => undefined);
+        return connection;
+      } finally {
+        ChromeTabConnection.openingConnections.delete(tabId);
       }
-      throw new LayerError('INTERNAL', `Cannot attach to tab ${tabId}: ${message}`);
-    }
-    const connection = new ChromeTabConnection(tabId, puppeteer);
-    connections.set(tabId, connection);
-    // The operated tab may sit in a window the user is not in; keep the page behaving as focused.
-    await connection.cdp
-      .send(undefined, 'Emulation.setFocusEmulationEnabled', { enabled: true })
-      .catch(() => undefined);
-    return connection;
+    })();
+
+    ChromeTabConnection.openingConnections.set(tabId, promise);
+    return promise;
   }
 
   /** Puppeteer's page, for diagnostics in the test extension's checks only. The layer never uses it. */

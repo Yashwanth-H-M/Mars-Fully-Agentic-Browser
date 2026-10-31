@@ -42,7 +42,7 @@ export async function testModel(
   const ask = probeAsk({ ...spec, overrides: stored?.overrides, tested: stored?.tested, fromApi: patch.fromApi });
   const result = await testConnection(spec, {}, ask);
   if (result.ok) {
-    patch.noToolCalling = !result.toolCalling;
+    patch.noToolCalling = provider.kind === 'ollama' || provider.kind === 'lmstudio' ? false : !result.toolCalling;
     if (result.tested) patch.tested = result.tested;
   }
   return { result, patch };

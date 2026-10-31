@@ -38,6 +38,31 @@ function holdsValue(node: LayoutNode): boolean {
   return node.tag === 'input' && !NO_VALUE_TYPES.has((node.attrs.type ?? '').toLowerCase());
 }
 
+function findOptionLabel(doc: LayoutDocument, node: LayoutNode): string | undefined {
+  // 1. Direct <label> wrapper or label[for]
+  const labels = labelsOf(doc, node);
+  for (const l of labels) {
+    const t = (doc.digest(l.index, 250) || doc.text(l.index, 250)).trim();
+    if (t) return t;
+  }
+  // 2. aria-label or title
+  if (node.attrs['aria-label']?.trim()) return node.attrs['aria-label'].trim();
+  if (node.attrs.title?.trim()) return node.attrs.title.trim();
+  // 3. Walk up ancestor tree (up to 4 levels) to find the enclosing option item container
+  let p = doc.byIndex[node.parent];
+  let depth = 0;
+  while (p && depth < 4) {
+    if (p.tag === 'body' || p.tag === 'html') break;
+    const t = doc.digest(p.index, 250).trim();
+    if (t.length > 0 && t.length < 250) {
+      return t;
+    }
+    p = doc.byIndex[p.parent];
+    depth++;
+  }
+  return undefined;
+}
+
 export function enrichFrame(
   roots: ONode[],
   doc: LayoutDocument,
@@ -121,6 +146,11 @@ export function enrichFrame(
 
   for (const node of doc.byIndex) {
     if (!node || node.tag === '#text') continue;
+    const isRadioOrCheck =
+      (node.tag === 'input' && (node.attrs.type === 'checkbox' || node.attrs.type === 'radio')) ||
+      node.attrs.role === 'radio' ||
+      node.attrs.role === 'checkbox';
+
     // A native checkbox or radio that is not rendered (display: none): promoted onto its visible label.
     if (
       node.tag === 'input' &&
@@ -130,7 +160,7 @@ export function enrichFrame(
     ) {
       const label = labelsOf(doc, node).find(isRendered);
       if (!label) continue;
-      const name = doc.text(label.index);
+      const name = findOptionLabel(doc, node) || doc.text(label.index);
       const created: ONode = {
         kind: 'element',
         rawRole: node.attrs.type,
@@ -152,17 +182,38 @@ export function enrichFrame(
       stats.promoted++;
       continue;
     }
+
     const existing = byBackend.get(node.backendNodeId);
+    if (isRadioOrCheck) {
+      const optLabel = findOptionLabel(doc, node);
+      if (optLabel) {
+        if (existing) {
+          existing.name = optLabel;
+          existing.role = node.attrs.type || node.attrs.role || 'radio';
+          existing.actionable = true;
+        }
+      }
+    }
+
     if (existing?.actionable) continue;
     if (!isRendered(node)) continue;
     const parent = doc.byIndex[node.parent];
     const signal = layoutSignal(node, parent);
     if (!signal) continue;
     if (insideActionable(node) && !isNativeControl(node) && !existing?.name) continue;
+
+    // Prune out large layout containers (divs, sections, headers, banners) that are not atomic controls
+    const isContainerTag = ['div', 'section', 'header', 'nav', 'main', 'article', 'aside', 'footer', 'ul', 'ol', 'form'].includes(node.tag);
+    const hasAriaInteractive = ['button', 'link', 'radio', 'checkbox', 'tab', 'menuitem'].includes(node.attrs.role ?? '');
+    if (isContainerTag && !hasAriaInteractive && !node.scrollable) {
+      const textLen = (doc.text(node.index) || '').length;
+      if (textLen > 35) continue;
+    }
+
     const digest = doc.digest(node.index);
-    // A field is named by its aria-label, labels or title (the sources revalidation checks), never by what it holds:
-    // a textarea's text or a select's options can be secrets.
-    const name = holdsValue(node)
+    const name = isRadioOrCheck && findOptionLabel(doc, node)
+      ? findOptionLabel(doc, node)!
+      : holdsValue(node)
       ? node.attrs['aria-label'] ||
         labelsOf(doc, node)
           .map(l => doc.text(l.index))
@@ -171,6 +222,7 @@ export function enrichFrame(
         node.attrs.title ||
         ''
       : doc.text(node.index) || node.attrs['aria-label'] || node.attrs.title || '';
+
     if (existing && existing.kind === 'element') {
       // An outline node without a ref (for example a named group) becomes actionable in place.
       existing.actionable = true;
@@ -180,7 +232,7 @@ export function enrichFrame(
       splice(node, {
         kind: 'element',
         rawRole: `layout:${node.tag}`,
-        role: layoutRole(node, signal),
+        role: isRadioOrCheck ? (node.attrs.type || node.attrs.role || 'radio') : layoutRole(node, signal),
         name,
         states: [],
         actionable: true,

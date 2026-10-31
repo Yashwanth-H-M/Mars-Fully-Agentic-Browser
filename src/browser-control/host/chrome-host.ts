@@ -36,6 +36,7 @@ export const chromeTabHost: TabHost = {
       const done = (error?: unknown) => {
         clearTimeout(timer);
         chrome.tabs.onUpdated.removeListener(listener);
+        chrome.tabs.onRemoved.removeListener(removedListener);
         if (error) reject(error);
         else resolve();
       };
@@ -44,6 +45,11 @@ export const chromeTabHost: TabHost = {
         if (id !== tabId) return;
         if (info.status === 'loading') started = true;
         else if (info.status === 'complete' && started) done();
+      };
+      const removedListener = (removedTabId: number) => {
+        if (removedTabId === tabId) {
+          done(new LayerError('TAB_NOT_IN_SESSION', `Tab ${tabId} was closed while loading ${url}`));
+        }
       };
       const timer = setTimeout(
         () =>
@@ -55,6 +61,7 @@ export const chromeTabHost: TabHost = {
         timeoutMs,
       );
       chrome.tabs.onUpdated.addListener(listener);
+      chrome.tabs.onRemoved.addListener(removedListener);
       chrome.tabs.update(tabId, { url }).catch(done);
     });
   },

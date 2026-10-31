@@ -206,5 +206,35 @@ describe('the limit per local server', () => {
     expect(res7).toHaveLength(1);
     expect(res7[0].toolName).toBe('click');
     expect(res7[0].input).toEqual({ target: { ref: 'e12' } });
+
+    // Pattern from qwen2.5-vl with browser-state quotes and repetitive unicode junk
+    const res8 = extractToolCallsFromText(
+      'open youtube and play a best song Extracted task from user message. time: 2026-10-30 13:54 · mode: navigate active tab: [201789907] «https://www.youtube.com/?hl=en&gl=US&q=%E3%80%B5%E3%80%A4%E3%80%B6%E3%80%A9%E3%80%B6%E3%80%A9%E3%80%B2%E3%80%A9»',
+      testTools,
+    );
+    expect(res8).toHaveLength(1);
+    expect(res8[0].toolName).toBe('navigate');
+    expect(res8[0].input).toEqual({ url: 'https://www.youtube.com/' });
+
+    // Natural open URL
+    const res9 = extractToolCallsFromText('open https://www.youtube.com', testTools);
+    expect(res9).toHaveLength(1);
+    expect(res9[0].toolName).toBe('navigate');
+    expect(res9[0].input).toEqual({ url: 'https://www.youtube.com' });
+
+    // Navigate to URL
+    const res10 = extractToolCallsFromText('navigate to https://www.youtube.com', testTools);
+    expect(res10).toHaveLength(1);
+    expect(res10[0].toolName).toBe('navigate');
+    expect(res10[0].input).toEqual({ url: 'https://www.youtube.com' });
+
+    // Thoughts stripped before tool call
+    const res11 = extractToolCallsFromText(
+      '<think>I will navigate now.</think> navigate({ url: "https://www.youtube.com" })',
+      testTools,
+    );
+    expect(res11).toHaveLength(1);
+    expect(res11[0].toolName).toBe('navigate');
+    expect(res11[0].input).toEqual({ url: 'https://www.youtube.com' });
   });
 });

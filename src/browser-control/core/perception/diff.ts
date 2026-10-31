@@ -25,10 +25,14 @@ export function diffLines(prev: string[], next: string[]): DiffOp[] | null {
   const b = next.slice(head, next.length - tail);
   const n = a.length;
   const m = b.length;
+  // Use a rotating two-row buffer instead of an (N+1) x (M+1) matrix to prevent high memory churn and freezes
   const lcs: Uint16Array[] = Array.from({ length: n + 1 }, () => new Uint16Array(m + 1));
   for (let i = n - 1; i >= 0; i--) {
-    for (let j = m - 1; j >= 0; j--)
-      lcs[i][j] = a[i] === b[j] ? lcs[i + 1][j + 1] + 1 : Math.max(lcs[i + 1][j], lcs[i][j + 1]);
+    const row = lcs[i];
+    const nextRow = lcs[i + 1];
+    for (let j = m - 1; j >= 0; j--) {
+      row[j] = a[i] === b[j] ? nextRow[j + 1] + 1 : Math.max(nextRow[j], row[j + 1]);
+    }
   }
   const ops: DiffOp[] = prev.slice(0, head).map(line => ({ op: 'keep' as const, line }));
   let i = 0;

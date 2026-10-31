@@ -9,10 +9,10 @@ export class TabLocks {
     const previous = this.#tails.get(tabId) ?? Promise.resolve();
     let release!: () => void;
     const current = new Promise<void>(resolve => (release = resolve));
-    const tail = previous.then(() => current);
+    const tail = previous.catch(() => {}).then(() => current);
     this.#tails.set(tabId, tail);
-    await previous;
     try {
+      await previous.catch(() => {});
       return await fn();
     } finally {
       release();

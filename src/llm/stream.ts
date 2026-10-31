@@ -99,8 +99,8 @@ export function toToolSet(tools: Record<string, ToolDefinition>): ToolSet {
   );
 }
 
-export function normalizeToolInput(toolName: string, raw: any): Record<string, any> {
-  const input = typeof raw === 'object' && raw !== null && !Array.isArray(raw) ? { ...raw } : {};
+export function normalizeToolInput(toolName: string, raw: unknown): Record<string, unknown> {
+  const input = typeof raw === 'object' && raw !== null && !Array.isArray(raw) ? { ...(raw as Record<string, unknown>) } : {};
   if (typeof raw === 'string') {
     if (toolName === 'navigate') return { url: raw };
     if (toolName === 'click' || toolName === 'read' || toolName === 'hover') return { target: { ref: raw } };
@@ -132,14 +132,16 @@ export function normalizeToolInput(toolName: string, raw: any): Record<string, a
   return input;
 }
 
-export function parseRelaxedJson(raw: string): any {
+export function parseRelaxedJson(raw: string): unknown {
   let s = raw.trim();
   if (s.startsWith('(') && s.endsWith(')')) s = s.slice(1, -1).trim();
   if (!s) return {};
 
   try {
     return JSON.parse(s);
-  } catch {}
+  } catch {
+    // try relaxed parsing
+  }
 
   if ((s.startsWith('{') && s.endsWith('}')) || (s.startsWith('[') && s.endsWith(']'))) {
     try {
@@ -151,7 +153,9 @@ export function parseRelaxedJson(raw: string): any {
         .replace(/\bFalse\b/g, 'false')
         .replace(/\bNone\b/g, 'null');
       return JSON.parse(relaxed);
-    } catch {}
+    } catch {
+      // try assignment syntax
+    }
   }
 
   if (/^[a-zA-Z_$][a-zA-Z0-9_$-]*\s*=/.test(s)) {
@@ -164,7 +168,9 @@ export function parseRelaxedJson(raw: string): any {
         .replace(/\bFalse\b/g, 'false')
         .replace(/\bNone\b/g, 'null');
       return JSON.parse(relaxed);
-    } catch {}
+    } catch {
+      // try string match
+    }
   }
 
   const strMatch = /^["'](.*)["']$/.exec(s);
@@ -175,14 +181,38 @@ export function parseRelaxedJson(raw: string): any {
   return null;
 }
 
-export function extractToolCallsFromText(text: string, tools: Record<string, ToolDefinition>): ToolCallRequest[] {
+function cleanUrl(raw: string): string {
+  let url = raw.trim().replace(/[»"'`\]),.]+$/, '');
+  try {
+    const parsed = new URL(url);
+    if (parsed.search && /(?:%[0-9a-fA-F]{2}){8,}/.test(parsed.search)) {
+      url = `${parsed.origin}${parsed.pathname}`;
+    }
+  } catch {
+    // invalid URL format, ignore
+  }
+  return url;
+}
+
+export function extractToolCallsFromText(rawText: string, tools: Record<string, ToolDefinition>): ToolCallRequest[] {
+  const text = rawText.replace(/<think>[\s\S]*?<\/think>/gi, '').trim() || rawText.trim();
   const known = new Set(Object.keys(tools));
   const results: ToolCallRequest[] = [];
 
-  const tryAdd = (obj: any): boolean => {
-    if (!obj || typeof obj !== 'object') return false;
-    const name = obj.name || obj.function?.name || obj.tool;
-    let args = obj.arguments || obj.function?.arguments || obj.args || obj.parameters || {};
+  const tryAdd = (obj: unknown): boolean => {
+    if (!obj) return false;
+    if (Array.isArray(obj)) {
+      let addedAny = false;
+      for (const item of obj) {
+        if (tryAdd(item)) addedAny = true;
+      }
+      return addedAny;
+    }
+    if (typeof obj !== 'object') return false;
+    const record = obj as Record<string, unknown>;
+    const funcRecord = (record.function && typeof record.function === 'object' ? record.function : undefined) as Record<string, unknown> | undefined;
+    const name = record.name || funcRecord?.name || record.tool;
+    let args = record.arguments || funcRecord?.arguments || record.args || record.parameters || {};
     if (typeof args === 'string') {
       try {
         args = JSON.parse(args);
@@ -287,7 +317,7 @@ export function extractToolCallsFromText(text: string, tools: Record<string, Too
   }
 
   // 6. Bare or shorthand line calls
-  if (known.has('snapshot') && /(?:^|\n)\s*(?:call:|tool:)?\s*`*snapshot(?:\(\))?`*[\s\.;]*(?:\n|$)/i.test(text)) {
+  if (known.has('snapshot') && /(?:^|\n)\s*(?:call:|tool:)?\s*`*snapshot(?:\(\))?`*[\s.;]*(?:\n|$)/i.test(text)) {
     results.push({
       toolCallId: `call_${Math.random().toString(36).slice(2, 10)}`,
       toolName: 'snapshot',
@@ -296,7 +326,7 @@ export function extractToolCallsFromText(text: string, tools: Record<string, Too
     return results;
   }
 
-  const clickLineMatch = /(?:^|\n)\s*(?:call:|tool:)?\s*`*click\s+\[?([a-zA-Z0-9_-]+)\]?`*[\s\.;]*(?:\n|$)/i.exec(text);
+  const clickLineMatch = /(?:^|\n)\s*(?:call:|tool:)?\s*`*click\s+\[?([a-zA-Z0-9_-]+)\]?`*[\s.;]*(?:\n|$)/i.exec(text);
   if (clickLineMatch && known.has('click')) {
     results.push({
       toolCallId: `call_${Math.random().toString(36).slice(2, 10)}`,
@@ -306,7 +336,7 @@ export function extractToolCallsFromText(text: string, tools: Record<string, Too
     return results;
   }
 
-  const readLineMatch = /(?:^|\n)\s*(?:call:|tool:)?\s*`*read\s+\[?([a-zA-Z0-9_-]+)\]?`*[\s\.;]*(?:\n|$)/i.exec(text);
+  const readLineMatch = /(?:^|\n)\s*(?:call:|tool:)?\s*`*read\s+\[?([a-zA-Z0-9_-]+)\]?`*[\s.;]*(?:\n|$)/i.exec(text);
   if (readLineMatch && known.has('read')) {
     results.push({
       toolCallId: `call_${Math.random().toString(36).slice(2, 10)}`,
@@ -316,14 +346,34 @@ export function extractToolCallsFromText(text: string, tools: Record<string, Too
     return results;
   }
 
-  const navLineMatch = /(?:^|\n)\s*(?:call:|tool:)?\s*`*navigate\s+(https?:\/\/[^\s`"']+)/i.exec(text);
-  if (navLineMatch && known.has('navigate')) {
-    results.push({
-      toolCallId: `call_${Math.random().toString(36).slice(2, 10)}`,
-      toolName: 'navigate',
-      input: { url: navLineMatch[1] },
-    });
-    return results;
+  if (known.has('navigate')) {
+    const navMatch = /(?:navigate(?:\s+to)?|goto|open|url:?)\s*[:=]?\s*[`"'(«]?\s*(https?:\/\/[^\s`"'»)\],]+)/i.exec(text);
+    if (navMatch) {
+      results.push({
+        toolCallId: `call_${Math.random().toString(36).slice(2, 10)}`,
+        toolName: 'navigate',
+        input: { url: cleanUrl(navMatch[1]) },
+      });
+      return results;
+    }
+    const bracketUrl = /«(https?:\/\/[^»\s]+)»/.exec(text);
+    if (bracketUrl) {
+      results.push({
+        toolCallId: `call_${Math.random().toString(36).slice(2, 10)}`,
+        toolName: 'navigate',
+        input: { url: cleanUrl(bracketUrl[1]) },
+      });
+      return results;
+    }
+    const mdLink = /\[(?:[^\]]*)\]\((https?:\/\/[^\s)]+)\)/.exec(text);
+    if (mdLink) {
+      results.push({
+        toolCallId: `call_${Math.random().toString(36).slice(2, 10)}`,
+        toolName: 'navigate',
+        input: { url: cleanUrl(mdLink[1]) },
+      });
+      return results;
+    }
   }
 
   return results;
@@ -430,6 +480,7 @@ async function streamTurnNow(request: TurnRequest): Promise<TurnResult> {
   for (;;) {
     attempt++;
     let text = '';
+    let reasoningText = '';
     let started = false;
     const toolCalls: ToolCallRequest[] = [];
     let finish: TurnFinish = 'other';
@@ -452,15 +503,19 @@ async function streamTurnNow(request: TurnRequest): Promise<TurnResult> {
       });
       for await (const part of result.fullStream) {
         switch (part.type) {
-          case 'text-delta':
+          case 'text-delta': {
             started = true;
             text += part.text;
             request.onTextDelta?.(part.text);
             break;
-          // Reasoning is discarded, but it has started the reply: an error after it is not retried.
-          case 'reasoning-delta':
+          }
+          case 'reasoning-delta': {
             started = true;
+            const deltaPart = part as { text?: string; reasoningText?: string; textDelta?: string };
+            const delta = deltaPart.text ?? deltaPart.reasoningText ?? deltaPart.textDelta ?? '';
+            reasoningText += delta;
             break;
+          }
           case 'tool-call': {
             started = true;
             const invalid = 'invalid' in part && part.invalid ? errorText(part.error) : undefined;
@@ -498,12 +553,24 @@ async function streamTurnNow(request: TurnRequest): Promise<TurnResult> {
       return { text, toolCalls: [], finish: 'aborted', usage, durationMs: Date.now() - start, attempts: attempt };
     }
     if (failure === undefined) {
-      if (toolCalls.length === 0 && request.tools && text.trim()) {
-        const extracted = extractToolCallsFromText(text, request.tools);
-        if (extracted.length > 0) {
-          toolCalls.push(...extracted);
-          text = '';
-          finish = 'tool-calls';
+      if (toolCalls.length === 0 && request.tools) {
+        if (text.trim()) {
+          const extracted = extractToolCallsFromText(text, request.tools);
+          if (extracted.length > 0) {
+            toolCalls.push(...extracted);
+            text = '';
+            finish = 'tool-calls';
+          }
+        }
+        if (toolCalls.length === 0 && reasoningText.trim()) {
+          const fromReasoning = extractToolCallsFromText(reasoningText, request.tools);
+          if (fromReasoning.length > 0) {
+            toolCalls.push(...fromReasoning);
+            text = '';
+            finish = 'tool-calls';
+          } else if (!text.trim()) {
+            text = reasoningText.replace(/<\/?think>/gi, '').trim();
+          }
         }
       }
       const cost = usage && usage.cost === undefined ? await request.chat.takeCost?.() : undefined;

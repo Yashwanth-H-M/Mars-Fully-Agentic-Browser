@@ -125,10 +125,18 @@ const CUT_REPLY =
 /** Refs a mutation's diff removed: a later call on one of them is skipped. */
 export function removedRefs(result: Result | undefined): Set<string> {
   const out = new Set<string>();
-  for (const op of result?.page?.diff?.ops ?? []) {
+  const ops = result?.page?.diff?.ops ?? [];
+  const added = new Set<string>();
+  for (const op of ops) {
+    if (typeof op === 'object' && 'add' in op) {
+      const ref = /\[(\w+)\]/.exec(op.add)?.[1];
+      if (ref) added.add(ref);
+    }
+  }
+  for (const op of ops) {
     if (typeof op === 'object' && 'remove' in op) {
       const ref = /\[(\w+)\]/.exec(op.remove)?.[1];
-      if (ref) out.add(ref);
+      if (ref && !added.has(ref)) out.add(ref);
     }
   }
   return out;
@@ -146,6 +154,7 @@ export function stopsBatch(call: ToolCallRequest, outcome: CallOutcome): boolean
   if (!r) return false;
   if (!r.ok) return true;
   const receipt = r.receipt;
+  // If the action caused a navigation or opened a new tab, subsequent actions targeted at the previous DOM cannot proceed.
   if (receipt?.navigation || receipt?.newTab) return true;
   if (r.pending?.length) return true;
   // A call that waited on a write card, whatever the answer: the page may have moved meanwhile.
@@ -168,6 +177,8 @@ export class AgentLoop {
   #toolNames: Set<string>;
   /** The address the model last saw for each tab, for the header's "changed" line. */
   #seen = new Map<number, string>();
+  /** The latest known revision for each tab, ensuring rev is monotonically tracked and never defaults to 0. */
+  #tabRevs = new Map<number, number>();
   /** The input tokens the provider last reported, and the request's characters then. */
   #reported: { input: number; chars: number } | null = null;
   /** Verification debt. */
@@ -428,6 +439,7 @@ export class AgentLoop {
       );
     }
     this.#seen.set(active.tabId, active.url);
+    if (result.page?.rev !== undefined) this.#tabRevs.set(active.tabId, result.page.rev);
     // Kept within budget: a share of the window, at 4 characters a token (max 16k chars to optimize token usage & speed).
     const budget = Math.max(2_000, Math.min(16_000, this.options.model.profile.contextWindow * 4 * 0.2));
     const outline = cutText(result.text, budget, '… the outline was cut; take a snapshot to see more.');
@@ -537,7 +549,10 @@ export class AgentLoop {
       outcome = await this.#handOver(outcome);
     else if (!outcome.skipped && !outcome.done) outcome = await this.#promptDialog(outcome);
     const page = outcome.result?.page;
-    if (page) this.#seen.set(page.tabId, page.url);
+    if (page) {
+      this.#seen.set(page.tabId, page.url);
+      if (page.rev !== undefined) this.#tabRevs.set(page.tabId, page.rev);
+    }
     const notes: string[] = [];
     if (!outcome.skipped && !outcome.done && outcome.call.toolName !== 'done') {
       this.#trackDebt(outcome);
@@ -661,17 +676,25 @@ export class AgentLoop {
     const tool = outcome.call.toolName;
     const args = (outcome.call.input ?? {}) as Record<string, unknown>;
     const tabId = r?.page?.tabId ?? (args.tabId as number | undefined) ?? this.#activeTab ?? -1;
+    if (r?.page?.rev !== undefined && tabId >= 0) {
+      this.#tabRevs.set(tabId, r.page.rev);
+    }
     if (r) this.#debt = this.#debt.filter(d => d.state !== 'open' || !clearsDebt(tool, r, d));
     if (PAGE_ACTIONS.has(tool) && r && (r.ok ? r.receipt?.dispatched !== false : r.error?.delivered !== false)) {
       this.#mutated = true;
     }
+    const currentRev =
+      r?.page?.rev ??
+      (tabId >= 0 ? this.#tabRevs.get(tabId) : undefined) ??
+      this.options.layer.tabInfo(tabId)?.rev ??
+      0;
     if (createsDebt(tool, r)) {
       this.#debt.push({
         toolCallId: outcome.call.toolCallId,
         tabId,
         state: 'open',
         label: debtLabel(tool, r, tabId),
-        rev: r?.page?.rev ?? this.options.layer.tabInfo(tabId)?.rev ?? 0,
+        rev: currentRev,
       });
     }
     if (tool === 'tabs' && r?.ok)
@@ -734,7 +757,18 @@ export class AgentLoop {
     }
     if (this.#guardStop) return this.salvage(this.#guardStop.reason, `guard_${this.#guardStop.guard}`);
     if (!reply.toolCalls.length) {
-      if (!this.#mutated) return { status: 'done', outcome: 'success', usage: this.#usage, turns: this.#turns };
+      if (!this.#mutated) {
+        if (!reply.text.trim()) {
+          return {
+            status: 'failed',
+            outcome: 'failed',
+            reason: 'The model returned an empty response without executing any actions. If using LM Studio, ensure you are using an Instruct model (such as Qwen2.5-Coder-7B-Instruct) with GPU Offload enabled in LM Studio settings.',
+            usage: this.#usage,
+            turns: this.#turns,
+          };
+        }
+        return { status: 'done', outcome: 'success', usage: this.#usage, turns: this.#turns };
+      }
       // Plain text after a mutation: one note, then partial.
       this.#plainEndings++;
       if (this.#plainEndings >= 2) {
@@ -854,6 +888,12 @@ export class AgentLoop {
               parts: [{ type: 'text', text: end.summary }],
             });
             emit({ type: 'message_end', entry: assistantDisplay(entry) });
+          } else if (end.reason && end.status === 'failed') {
+            const entry = await this.writer.ui('notice', { text: end.reason, tone: 'warn' });
+            emit({
+              type: 'message_end',
+              entry: { kind: 'notice', id: entry.id, text: end.reason, tone: 'warn', at: entry.at },
+            });
           }
           return this.#end(end);
         }
@@ -1051,7 +1091,19 @@ export class AgentLoop {
         await skipRest(i, SKIP_CHANGED);
         return outcomes;
       }
-      const o = await this.#execute(call);
+      // Find the last mutating call in runnable so it gets observe: 'diff'
+      // even if the batch ends with control calls like `done` or `ask_user`.
+      let lastMutateIndex = -1;
+      for (let k = runnable.length - 1; k >= 0; k--) {
+        const kKind = kindOf(runnable[k].toolName, (runnable[k].input ?? {}) as Record<string, unknown>);
+        if (kKind === 'mutate' && runnable[k].toolName !== 'tabs') {
+          lastMutateIndex = k;
+          break;
+        }
+      }
+      const isLastMutation = i === lastMutateIndex;
+      const isLastInBatch = i === runnable.length - 1 || isLastMutation;
+      const o = await this.#execute(call, isLastInBatch);
       outcomes.push(o);
       await this.#record(o);
       i++;
@@ -1075,7 +1127,7 @@ export class AgentLoop {
   /** Whether the user has sent a message while the run works. Set by the extension. */
   hasSteering: () => boolean = () => false;
 
-  async #execute(call: ToolCallRequest): Promise<CallOutcome> {
+  async #execute(call: ToolCallRequest, isLastInBatch = true): Promise<CallOutcome> {
     const { emit, signal } = this.options;
     const args = (call.input ?? {}) as Record<string, unknown>;
     const kind = kindOf(call.toolName, args);
@@ -1096,7 +1148,7 @@ export class AgentLoop {
       } else {
         const result = await this.options.layer.call(
           'upload',
-          { ...rest, attachments: files.files, observe: 'diff' },
+          { ...rest, attachments: files.files, observe: isLastInBatch ? 'diff' : 'none' },
           signal,
         );
         outcome = { call, kind, text: result.text, isError: !result.ok, result };
@@ -1113,8 +1165,12 @@ export class AgentLoop {
         : { text: `error: ${call.toolName} is not available.`, isError: true };
       outcome = { call, kind, text: r.text, isError: r.isError };
     } else {
-      // Mutations return their diff; the model never sets `observe`.
-      const sent = kind === 'mutate' && call.toolName !== 'tabs' ? { ...args, observe: 'diff' } : args;
+      // Mutations: intermediate mutations in a batch use observe: 'none' for lightning speed;
+      // the last mutation in the batch observes 'diff' to report the page state.
+      const sent =
+        kind === 'mutate' && call.toolName !== 'tabs'
+          ? { ...args, observe: isLastInBatch ? 'diff' : 'none' }
+          : args;
       const result = await this.options.layer.call(call.toolName, sent, signal);
       outcome = { call, kind, text: result.text, isError: !result.ok, result };
     }

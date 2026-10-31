@@ -134,9 +134,30 @@ export async function getEntries(conversationId: string): Promise<Entry[]> {
 
 /** The path from the root to `leafId` (default: the conversation's leaf), oldest first. */
 export async function activeBranch(conversationId: string, leafId?: string | null): Promise<Entry[]> {
-  const conversation = await getConversation(conversationId);
-  const leaf = leafId !== undefined ? leafId : (conversation?.leafId ?? null);
-  return branchFrom(await getEntries(conversationId), leaf);
+  const database = await db();
+  const tx = database.transaction(['conversations', 'entries'], 'readonly');
+  let leaf = leafId;
+  if (leaf === undefined) {
+    const conversation = await tx.objectStore('conversations').get(conversationId);
+    leaf = conversation?.leafId ?? null;
+  }
+  if (!leaf) {
+    await tx.done;
+    return [];
+  }
+  const store = tx.objectStore('entries');
+  const path: Entry[] = [];
+  const seen = new Set<string>();
+  let id: string | null = leaf;
+  while (id && !seen.has(id)) {
+    seen.add(id);
+    const entry = await store.get(id);
+    if (!entry || entry.conversationId !== conversationId) break;
+    path.push(entry);
+    id = entry.parentId;
+  }
+  await tx.done;
+  return path.reverse();
 }
 
 export function branchFrom(entries: Entry[], leafId: string | null): Entry[] {

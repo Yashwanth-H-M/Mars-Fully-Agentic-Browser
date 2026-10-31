@@ -52,13 +52,18 @@ export async function sendRaw<T = unknown>(
   if (debuggerSessionId) target.sessionId = debuggerSessionId;
 
   let timer: ReturnType<typeof setTimeout> | undefined;
+  let timedOut = false;
   const timeout = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => reject(new CdpTimeoutError(method, timeoutMs)), timeoutMs);
+    timer = setTimeout(() => {
+      timedOut = true;
+      reject(new CdpTimeoutError(method, timeoutMs));
+    }, timeoutMs);
   });
   try {
     const command = chrome.debugger
       .sendCommand(target, method, params as Record<string, unknown>)
       .catch((error: unknown) => {
+        if (timedOut) return undefined as never;
         const message = error instanceof Error ? error.message : String(error);
         if (/not attached|Detached while handling command|No tab with given id/i.test(message)) {
           throw new LayerError('DEBUGGER_DETACHED', `${method}: ${message}`, { delivered: 'unknown' });

@@ -37,7 +37,7 @@ describe('SKILL.md', () => {
         'disable-model-invocation: true',
         'user-invocable: true',
         'metadata:',
-        '  nanobrowser:',
+        '  mars:',
         '    start-url: https://www.concursolutions.com/',
         '    mode: ask',
         '    provider: p1',

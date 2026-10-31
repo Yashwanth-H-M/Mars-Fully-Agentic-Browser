@@ -78,8 +78,16 @@ function readBack(wanted: string, got: string | null, masked: boolean): ActionRe
 
 /** Focuses a field with a trusted click; the key guard is armed after it. */
 async function focusForText(ctx: ToolContext, target: ResolvedTarget, timeoutMs?: number) {
+  const { cdp } = await ctx.attach();
+  // Try native DOM.focus first: fast, reliable, and directly focuses inputs, textareas, and code editors
+  await cdp
+    .send(target.frame.sessionId, 'DOM.focus', { backendNodeId: target.record.backendNodeId })
+    .catch(() => undefined);
+  let state = await stateOf(ctx, target).catch(() => null);
+  if (state?.focused) return;
+
   const actionable = await waitForActionable(ctx, target, { pointer: true, editable: true, budgetMs: timeoutMs });
-  const state = await stateOf(ctx, target);
+  state = await stateOf(ctx, target);
   if (!state.focused) {
     const click = await dispatchClick(ctx, target, actionable.point, {});
     if (click.dialog) {
@@ -87,6 +95,12 @@ async function focusForText(ctx: ToolContext, target: ResolvedTarget, timeoutMs?
       throw new LayerError('MODAL_PENDING', 'A dialog opened when the field was focused; nothing was typed.', {
         delivered: true,
       });
+    }
+    const afterClick = await stateOf(ctx, target).catch(() => null);
+    if (!afterClick?.focused) {
+      await cdp
+        .send(target.frame.sessionId, 'DOM.focus', { backendNodeId: target.record.backendNodeId })
+        .catch(() => undefined);
     }
   }
 }
@@ -845,6 +859,24 @@ export async function type(ctx: ToolContext, args: TypeArgs): Promise<ToolOutcom
     const { evidence } = await withEvidence(ctx, target, args.expect, { masked }, () =>
       withKeyGuard(ctx, arm, judgeRelease, async keys => {
         ctx.tab().actionSeq++;
+        if (args.text.includes('\n') || (chars.length > 50 && target)) {
+          const { cdp } = await ctx.attach();
+          if (target) {
+            const isEditor = await ctx.tab().probe?.call<boolean>(target.frame, target.objectId, 'isEditor').catch(() => false);
+            if (isEditor) {
+              await ctx.tab().probe?.call(target.frame, target.objectId, 'selectContents').catch(() => false);
+            }
+          }
+          const dialog = await keys.unit(async () => {
+            await cdp.send(undefined, 'Input.insertText', { text: args.text });
+          });
+          if (dialog && args.submit) interrupted(ctx, dialog, 'The text was inserted; Enter was not sent.');
+          if (dialog) return { dialog };
+          if (args.submit) {
+            return { dialog: await keys.press('Enter') };
+          }
+          return {};
+        }
         for (let i = 0; i < chars.length; i++) {
           const key = dispatchedKey(chars[i]);
           if (again && (key === 'Enter' || key === 'Space')) {

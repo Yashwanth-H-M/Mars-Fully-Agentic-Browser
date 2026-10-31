@@ -60,7 +60,7 @@ describe('inlining at the start of a run', () => {
     const [list, a, b] = parts as Array<Extract<MessagePart, { type: 'text' }>>;
     // First, the files with their ids, so the agent can name them.
     expect(list.text).toBe(
-      `[Nanobrowser note: files attached to this message: «notes.md» (id f-notes.md, text/markdown, 17 bytes); «log.txt» (id f-log.txt, text/plain, ${budget + 500} bytes).]`,
+      `[Mars note: files attached to this message: «notes.md» (id f-notes.md, text/markdown, 17 bytes); «log.txt» (id f-log.txt, text/plain, ${budget + 500} bytes).]`,
     );
     expect(a.text).toContain('source=attachment «notes.md»');
     expect(a.text).toContain('Buy milk.');
@@ -69,7 +69,7 @@ describe('inlining at the start of a run', () => {
       `has ${budget + 500} characters; the first ${budget} are above. read_attachment with this id and offset ${budget} reads on.`,
     );
     // The note is the extension's own line, after the boundary.
-    expect(b.text.indexOf('<<<end-page-content N>>>')).toBeLessThan(b.text.indexOf('[Nanobrowser note:'));
+    expect(b.text.indexOf('<<<end-page-content N>>>')).toBeLessThan(b.text.indexOf('[Mars note:'));
   });
 
   it('sends an image after its fixed line to a vision model, and nothing to another', async () => {

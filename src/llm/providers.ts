@@ -109,9 +109,10 @@ export function createModel(spec: ModelSpec, options: CreateModelOptions = {}): 
         effectiveFetch = async (input, init) => {
           if (typeof init?.body === 'string') {
             try {
-              const body = JSON.parse(init.body) as Record<string, any>;
-              if (!body.options) body.options = {};
-              if (!body.options.num_ctx) body.options.num_ctx = 32768;
+              const body = JSON.parse(init.body) as Record<string, unknown>;
+              const options = (body.options && typeof body.options === 'object' ? body.options : {}) as Record<string, unknown>;
+              if (!options.num_ctx) options.num_ctx = 32768;
+              body.options = options;
               init = { ...init, body: JSON.stringify(body) };
             } catch {
               // ignore
