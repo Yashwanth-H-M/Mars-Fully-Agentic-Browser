@@ -67,7 +67,7 @@ Mars connects out of the box to any model provider using the Vercel AI SDK:
 ### Option 1: Direct Download (Ready to Use — No Node.js Required)
 
 1. Download the pre-built extension zip:
-   - **[Download `mars-0.3.0.zip`](./releases/mars-0.3.0.zip)** (or from the [GitHub Releases](https://github.com/Yashwanth-H-M/Mars-Fully-Agentic-Browser/releases) page).
+   - **[⬇️ Download `mars-0.3.0.zip` (Direct Download)](https://github.com/Yashwanth-H-M/Mars-Fully-Agentic-Browser/raw/main/releases/mars-0.3.0.zip)** (or from [GitHub Releases](https://github.com/Yashwanth-H-M/Mars-Fully-Agentic-Browser/releases)).
 2. Unzip `mars-0.3.0.zip` into a folder on your computer.
 3. Open your browser and go to:
    - **Chrome:** `chrome://extensions`
