@@ -320,7 +320,14 @@ export function setBorder(state: BorderState): Promise<void> | void {
 
     // The cursor is 100% independent: it listens ONLY to agent messages from the extension.
     // It does NOT listen to user mousemove, mousedown, or keydown events, ensuring user movements never interrupt it.
-    const onMessage = (msg: { type?: string; id?: string; x?: number; y?: number; action?: string; label?: string }) => {
+    const onMessage = (msg: {
+      type?: string;
+      id?: string;
+      x?: number;
+      y?: number;
+      action?: string;
+      label?: string;
+    }) => {
       if (msg && msg.type === 'mars:cursor') {
         const curId = msg.id || 'mars';
         const cur = getOrCreateCursor(curId);

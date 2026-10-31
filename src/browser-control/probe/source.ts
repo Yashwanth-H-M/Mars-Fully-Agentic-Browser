@@ -256,7 +256,11 @@ export function probeMain(): void {
   /** Finds the enclosing editor container for an element, or the element itself if it is the container */
   const editorContainerOf = (el: Element | null): Element | null => {
     if (!el) return null;
-    return el.closest(EDITOR_CONTAINER_SEL) || el.closest('[class*="editor" i]') || (el.matches(EDITOR_CONTAINER_SEL) ? el : null);
+    return (
+      el.closest(EDITOR_CONTAINER_SEL) ||
+      el.closest('[class*="editor" i]') ||
+      (el.matches(EDITOR_CONTAINER_SEL) ? el : null)
+    );
   };
   /**
    * A control of its own inside a target: native controls, links and the widget roles that activate. Content of an
@@ -931,13 +935,13 @@ export function probeMain(): void {
           target.closest('[class*="ace_"]') ||
           target.closest('.ace_editor') ||
           target.matches('.ace_editor') ||
-          (target as any).env?.editor
+          (target as any).env?.editor,
         );
         const isHitAce = Boolean(
           hitEl.closest('[class*="ace_"]') ||
           hitEl.closest('.ace_editor') ||
           hitEl.matches('.ace_editor') ||
-          (hitEl as any).env?.editor
+          (hitEl as any).env?.editor,
         );
         if (isTargetAce && isHitAce) {
           return { accepted: true, kind: 'inside' as const };
@@ -945,14 +949,10 @@ export function probeMain(): void {
 
         // Monaco Editor: lines, scrollable elements, margin overlays, and inputarea share .monaco-editor
         const isTargetMonaco = Boolean(
-          target.closest('[class*="monaco-"]') ||
-          target.closest('.monaco-editor') ||
-          target.matches('.monaco-editor')
+          target.closest('[class*="monaco-"]') || target.closest('.monaco-editor') || target.matches('.monaco-editor'),
         );
         const isHitMonaco = Boolean(
-          hitEl.closest('[class*="monaco-"]') ||
-          hitEl.closest('.monaco-editor') ||
-          hitEl.matches('.monaco-editor')
+          hitEl.closest('[class*="monaco-"]') || hitEl.closest('.monaco-editor') || hitEl.matches('.monaco-editor'),
         );
         if (isTargetMonaco && isHitMonaco) {
           return { accepted: true, kind: 'inside' as const };
@@ -960,12 +960,10 @@ export function probeMain(): void {
 
         // CodeMirror Editor
         const isTargetCm = Boolean(
-          target.closest('[class*="CodeMirror"], [class*="cm-"]') ||
-          target.closest('.CodeMirror, .cm-editor')
+          target.closest('[class*="CodeMirror"], [class*="cm-"]') || target.closest('.CodeMirror, .cm-editor'),
         );
         const isHitCm = Boolean(
-          hitEl.closest('[class*="CodeMirror"], [class*="cm-"]') ||
-          hitEl.closest('.CodeMirror, .cm-editor')
+          hitEl.closest('[class*="CodeMirror"], [class*="cm-"]') || hitEl.closest('.CodeMirror, .cm-editor'),
         );
         if (isTargetCm && isHitCm) {
           return { accepted: true, kind: 'inside' as const };
@@ -1057,17 +1055,19 @@ export function probeMain(): void {
         (hit !== null &&
           Boolean(
             (target.closest('[class*="ace_"]') || target.closest('.ace_editor') || target.matches('.ace_editor')) &&
-            (hit.closest('[class*="ace_"]') || hit.closest('.ace_editor') || hit.matches('.ace_editor'))
+            (hit.closest('[class*="ace_"]') || hit.closest('.ace_editor') || hit.matches('.ace_editor')),
           )) ||
         (hit !== null &&
           Boolean(
-            (target.closest('[class*="monaco-"]') || target.closest('.monaco-editor') || target.matches('.monaco-editor')) &&
-            (hit.closest('[class*="monaco-"]') || hit.closest('.monaco-editor') || hit.matches('.monaco-editor'))
+            (target.closest('[class*="monaco-"]') ||
+              target.closest('.monaco-editor') ||
+              target.matches('.monaco-editor')) &&
+            (hit.closest('[class*="monaco-"]') || hit.closest('.monaco-editor') || hit.matches('.monaco-editor')),
           )) ||
         (hit !== null &&
           Boolean(
             (target.closest('[class*="CodeMirror"], [class*="cm-"]') || target.closest('.CodeMirror, .cm-editor')) &&
-            (hit.closest('[class*="CodeMirror"], [class*="cm-"]') || hit.closest('.CodeMirror, .cm-editor'))
+            (hit.closest('[class*="CodeMirror"], [class*="cm-"]') || hit.closest('.CodeMirror, .cm-editor')),
           )) ||
         (unfocused && (!hit || hit === document.documentElement));
       const report: GuardReport =

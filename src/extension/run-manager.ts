@@ -290,21 +290,25 @@ export class RunManager {
   async #openSession(conversationId: string): Promise<Session> {
     const controller = await controllerReady;
     await this.permissions.ready();
-    const session = createAgentSession(controller, {
-      decideWrite: question => this.permissions.decide(this.#modes.get(conversationId) ?? 'ask', question),
-      urlPolicy: { allow: [], deny: [], blocked: this.permissions.blockedSites() },
-      // The watching rule: a tab becomes visible only while the user is on the conversation's tabs.
-      reveal: () => this.scope.watching(conversationId),
-      onTabJoined: (tabId, how) => {
-        if (how === 'shared') return;
-        void (async () => {
-          const watching = await this.scope.watching(conversationId);
-          await this.scope.add(conversationId, tabId, 'agent');
-          // Chrome brings a page-opened tab forward; out of view, the user's tab goes back on top.
-          if (how === 'page-opened' && !watching) await this.scope.restoreView(tabId);
-        })();
+    const session = createAgentSession(
+      controller,
+      {
+        decideWrite: question => this.permissions.decide(this.#modes.get(conversationId) ?? 'ask', question),
+        urlPolicy: { allow: [], deny: [], blocked: this.permissions.blockedSites() },
+        // The watching rule: a tab becomes visible only while the user is on the conversation's tabs.
+        reveal: () => this.scope.watching(conversationId),
+        onTabJoined: (tabId, how) => {
+          if (how === 'shared') return;
+          void (async () => {
+            const watching = await this.scope.watching(conversationId);
+            await this.scope.add(conversationId, tabId, 'agent');
+            // Chrome brings a page-opened tab forward; out of view, the user's tab goes back on top.
+            if (how === 'page-opened' && !watching) await this.scope.restoreView(tabId);
+          })();
+        },
       },
-    }, this.border);
+      this.border,
+    );
     this.#sessions.set(conversationId, session);
     for (const tabId of await this.scope.tabsOf(conversationId)) {
       // A tab on a blocked site stays out; the run says so through the layer's refusals.

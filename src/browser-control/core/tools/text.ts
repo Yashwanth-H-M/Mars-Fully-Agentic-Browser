@@ -92,7 +92,7 @@ async function focusForText(ctx: ToolContext, target: ResolvedTarget, timeoutMs?
       .probe?.call<boolean>(target.frame, target.objectId, 'isEditor')
       .catch(() => false)) ||
     state?.tag === 'textarea' ||
-    target.record.print.role === 'textbox'
+    target.record.print.role === 'textbox',
   );
   const actionable = await waitForActionable(ctx, target, { pointer: !isEditor, editable: true, budgetMs: timeoutMs });
   state = await stateOf(ctx, target);
@@ -762,9 +762,12 @@ export async function set(ctx: ToolContext, args: SetArgs): Promise<ToolOutcome>
     }
     if (state.editable || state.contentEditable || state.tag === 'input' || state.tag === 'textarea') {
       const isEditor = Boolean(
-        (await ctx.tab().probe?.call<boolean>(target.frame, target.objectId, 'isEditor').catch(() => false)) ||
+        (await ctx
+          .tab()
+          .probe?.call<boolean>(target.frame, target.objectId, 'isEditor')
+          .catch(() => false)) ||
         state.tag === 'textarea' ||
-        target.record.print.role === 'textbox'
+        target.record.print.role === 'textbox',
       );
       const isFocused = state.focused;
       const needsPointer = !isEditor && !isFocused;
@@ -822,9 +825,12 @@ export async function type(ctx: ToolContext, args: TypeArgs): Promise<ToolOutcom
       const state = await stateOf(ctx, target);
       mode = args.submit ? 'enter' : typedMode(args.text, false, state);
       const isEditor = Boolean(
-        (await ctx.tab().probe?.call<boolean>(target.frame, target.objectId, 'isEditor').catch(() => false)) ||
+        (await ctx
+          .tab()
+          .probe?.call<boolean>(target.frame, target.objectId, 'isEditor')
+          .catch(() => false)) ||
         state.tag === 'textarea' ||
-        target.record.print.role === 'textbox'
+        target.record.print.role === 'textbox',
       );
       const isFocused = state.focused;
       const needsPointer = !isEditor && !isFocused;

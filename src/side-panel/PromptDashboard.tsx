@@ -137,12 +137,16 @@ export function PromptDashboard({ open, onOpenChange, settings }: PromptDashboar
           {isCreating ? (
             <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto">
               <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold">{editingPreset ? 'Edit System Prompt' : 'Create Custom Prompt'}</h3>
+                <h3 className="text-sm font-semibold">
+                  {editingPreset ? 'Edit System Prompt' : 'Create Custom Prompt'}
+                </h3>
                 <span className="text-xs text-nb-muted">Fully isolated from other prompts</span>
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <label htmlFor="prompt-name" className="text-xs font-medium text-nb-muted">Prompt Name *</label>
+                <label htmlFor="prompt-name" className="text-xs font-medium text-nb-muted">
+                  Prompt Name *
+                </label>
                 <input
                   id="prompt-name"
                   type="text"
@@ -154,7 +158,9 @@ export function PromptDashboard({ open, onOpenChange, settings }: PromptDashboar
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <label htmlFor="prompt-desc" className="text-xs font-medium text-nb-muted">Description (optional)</label>
+                <label htmlFor="prompt-desc" className="text-xs font-medium text-nb-muted">
+                  Description (optional)
+                </label>
                 <input
                   id="prompt-desc"
                   type="text"
@@ -166,7 +172,9 @@ export function PromptDashboard({ open, onOpenChange, settings }: PromptDashboar
               </div>
 
               <div className="flex min-h-0 flex-1 flex-col gap-1.5">
-                <label htmlFor="prompt-body" className="text-xs font-medium text-nb-muted">System Prompt Body *</label>
+                <label htmlFor="prompt-body" className="text-xs font-medium text-nb-muted">
+                  System Prompt Body *
+                </label>
                 <textarea
                   id="prompt-body"
                   placeholder="Enter full system prompt instructions for the agent..."

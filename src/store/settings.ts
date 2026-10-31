@@ -106,7 +106,10 @@ export const DEFAULT_SETTINGS: Settings = {
 
 /** Stored settings over the defaults, so a field added later has its default. */
 export function mergeSettings(stored: unknown): Settings {
-  const merged = { ...DEFAULT_SETTINGS, ...(stored && typeof stored === 'object' ? (stored as Partial<Settings>) : {}) };
+  const merged = {
+    ...DEFAULT_SETTINGS,
+    ...(stored && typeof stored === 'object' ? (stored as Partial<Settings>) : {}),
+  };
   if (!merged.customPrompts || !Array.isArray(merged.customPrompts) || merged.customPrompts.length === 0) {
     merged.customPrompts = DEFAULT_PROMPT_PRESETS;
   }

@@ -603,11 +603,7 @@ export function App() {
           client?.send({ type: 'delete', conversationId: id, closeAgentTabs });
         }}
       />
-      <PromptDashboard
-        open={promptDashboardOpen}
-        onOpenChange={setPromptDashboardOpen}
-        settings={settings}
-      />
+      <PromptDashboard open={promptDashboardOpen} onOpenChange={setPromptDashboardOpen} settings={settings} />
       <div role="status" aria-live="polite" className="sr-only">
         {t(`status.${state.status}`)}
       </div>
