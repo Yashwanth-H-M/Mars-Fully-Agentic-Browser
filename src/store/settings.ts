@@ -37,7 +37,51 @@ export interface Settings {
   analyticsStats: boolean;
   /** A glowing border on the pages a working run acts on. */
   pageBorder: boolean;
+  /** Active system prompt ID ('default' or custom ID). */
+  activePromptId: string;
+  /** Presets and custom user system prompts. */
+  customPrompts: SystemPromptPreset[];
 }
+
+export interface SystemPromptPreset {
+  id: string;
+  name: string;
+  description?: string;
+  prompt: string;
+  isBuiltIn?: boolean;
+}
+
+export const DEFAULT_PROMPT_PRESETS: SystemPromptPreset[] = [
+  {
+    id: 'default',
+    name: 'Exam & Coding (Default)',
+    description: 'Hyper-fast bifurcated prompt for MCQs, quizzes, and coding exams (Ace/Monaco).',
+    prompt: '',
+    isBuiltIn: true,
+  },
+  {
+    id: 'general-web',
+    name: 'General Web Assistant',
+    description: 'Autonomous web browsing, search, reading pages, and general tasks.',
+    prompt: `You are Mars, a fast autonomous browser agent.
+Execute user tasks with maximum speed, zero chatter, and high precision.
+- Observe pages and read content to answer user questions.
+- Interact with web elements using click, type, press, scroll, and wait.
+- Always report clear, structured findings.`,
+    isBuiltIn: true,
+  },
+  {
+    id: 'mcq-specialist',
+    name: 'Fast MCQ / Quiz Only',
+    description: 'Ultra-fast single-turn MCQ solver: reads question, clicks option, submits.',
+    prompt: `You are Mars, an ultra-fast quiz and MCQ solver.
+- Never search for code editors.
+- Solve the question accurately.
+- Click the correct choice radio button/card directly by ref or text.
+- Click submit to advance. Zero chatter.`,
+    isBuiltIn: true,
+  },
+];
 
 export const DEFAULT_SETTINGS: Settings = {
   defaultMode: 'auto',
@@ -56,11 +100,20 @@ export const DEFAULT_SETTINGS: Settings = {
   analyticsPing: true,
   analyticsStats: true,
   pageBorder: true,
+  activePromptId: 'default',
+  customPrompts: DEFAULT_PROMPT_PRESETS,
 };
 
 /** Stored settings over the defaults, so a field added later has its default. */
 export function mergeSettings(stored: unknown): Settings {
-  return { ...DEFAULT_SETTINGS, ...(stored && typeof stored === 'object' ? (stored as Partial<Settings>) : {}) };
+  const merged = { ...DEFAULT_SETTINGS, ...(stored && typeof stored === 'object' ? (stored as Partial<Settings>) : {}) };
+  if (!merged.customPrompts || !Array.isArray(merged.customPrompts) || merged.customPrompts.length === 0) {
+    merged.customPrompts = DEFAULT_PROMPT_PRESETS;
+  }
+  if (!merged.activePromptId) {
+    merged.activePromptId = 'default';
+  }
+  return merged;
 }
 
 export const settingsStorage = createStorage<Settings>('nb.settings', DEFAULT_SETTINGS, {

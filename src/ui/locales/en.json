@@ -354,7 +354,7 @@
   "shortcut.blocked": "The shortcut's start page is on a site you blocked. Nothing was sent.",
   "panel.starters": "Quick start",
   "panel.starter.star": "Star us on GitHub",
-  "panel.starter.starText": "Open https://github.com/Mars/Mars. If I'm signed in and haven't starred it yet, star it. If I'm not signed in, stop and tell me.",
+  "panel.starter.starText": "Open https://github.com/Yashwanth-H-M/Mars-Fully-Agentic-Browser. If I'm signed in and haven't starred it yet, star it. If I'm not signed in, stop and tell me.",
   "panel.starter.summarize": "Summarize this page",
   "panel.starter.summarizeText": "Summarize this page in a few bullet points.",
   "panel.starter.news": "Today on Hacker News",

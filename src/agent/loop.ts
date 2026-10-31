@@ -1092,12 +1092,12 @@ export class AgentLoop {
         await skipRest(i, SKIP_CHANGED);
         return outcomes;
       }
-      // Find the last mutating call in runnable so it gets observe: 'diff'
+      // Find the last mutating or wait call in runnable so it gets observe: 'diff'
       // even if the batch ends with control calls like `done` or `ask_user`.
       let lastMutateIndex = -1;
       for (let k = runnable.length - 1; k >= 0; k--) {
         const kKind = kindOf(runnable[k].toolName, (runnable[k].input ?? {}) as Record<string, unknown>);
-        if (kKind === 'mutate' && runnable[k].toolName !== 'tabs') {
+        if ((kKind === 'mutate' || kKind === 'wait') && runnable[k].toolName !== 'tabs') {
           lastMutateIndex = k;
           break;
         }
@@ -1166,10 +1166,10 @@ export class AgentLoop {
         : { text: `error: ${call.toolName} is not available.`, isError: true };
       outcome = { call, kind, text: r.text, isError: r.isError };
     } else {
-      // Mutations: intermediate mutations in a batch use observe: 'none' for lightning speed;
-      // the last mutation in the batch observes 'diff' to report the page state.
-      const sent =
-        kind === 'mutate' && call.toolName !== 'tabs' ? { ...args, observe: isLastInBatch ? 'diff' : 'none' } : args;
+      // Mutations & waits: intermediate calls in a batch use observe: 'none' for lightning speed;
+      // the last mutation or wait in the batch observes 'diff' to report the page state.
+      const shouldObserve = (kind === 'mutate' || kind === 'wait') && call.toolName !== 'tabs';
+      const sent = shouldObserve ? { ...args, observe: isLastInBatch ? 'diff' : 'none' } : args;
       const result = await this.options.layer.call(call.toolName, sent, signal);
       outcome = { call, kind, text: result.text, isError: !result.ok, result };
     }

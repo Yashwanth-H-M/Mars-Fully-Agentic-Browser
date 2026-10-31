@@ -32,8 +32,9 @@ import { installTestHook } from './test-hook';
 import type { SavedShortcut } from '@src/store/shortcuts';
 import { useShortcuts } from '@src/ui/shortcuts';
 import { AutoNotice } from '@src/ui/auto-notice';
-import { FileIcon, HistoryIcon, LogoMark, NewChatIcon, SettingsIcon } from '@src/ui/icons';
+import { ChevronIcon, FileIcon, HistoryIcon, LogoMark, NewChatIcon, PromptIcon, SettingsIcon } from '@src/ui/icons';
 import { websiteUrl } from '@src/ui/links';
+import { PromptDashboard } from './PromptDashboard';
 
 const NO_PROVIDERS: ProviderConfig[] = [];
 const NO_KEYS: Record<string, string> = {};
@@ -167,6 +168,15 @@ export function App() {
   const [draftMode, setDraftMode] = useState<PermissionMode | null>(null);
   const [draftPair, setDraftPair] = useState<LivePair | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [promptDashboardOpen, setPromptDashboardOpen] = useState(false);
+  const activePromptName = useMemo(() => {
+    const presets =
+      settings.customPrompts && settings.customPrompts.length > 0
+        ? settings.customPrompts
+        : DEFAULT_SETTINGS.customPrompts;
+    const active = presets.find(p => p.id === (settings.activePromptId || 'default'));
+    return active?.name || 'Default';
+  }, [settings.customPrompts, settings.activePromptId]);
   const shortcuts = useShortcuts();
   const [autoNotice, setAutoNotice] = useState(false);
   /** A message held back because it looks like a card number. */
@@ -440,40 +450,54 @@ export function App() {
     <div className={`flex h-full flex-col${empty && state.loaded ? ' nb-start' : ''}`}>
       {/* The header has no field of its own, so it is part of the panel; a line under it only above a conversation. */}
       <header
-        className={`flex items-center gap-1 border-b px-2 py-1.5 ${empty && state.loaded ? 'border-transparent' : 'border-nb-border/60'}`}>
+        className={`flex items-center gap-1.5 border-b px-3 py-2 transition-colors ${empty && state.loaded ? 'border-transparent' : 'border-nb-border/40 bg-nb-bg/40 backdrop-blur-sm'}`}>
         {/* The mark opens the website in a new tab. */}
-        <a
-          href={websiteUrl('/', 'side-panel')}
-          target="_blank"
-          rel="noreferrer"
-          title={t('panel.website')}
-          aria-label={t('panel.website')}
-          className="ml-1 flex shrink-0 rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-nb-accent">
-          <LogoMark size={20} />
-        </a>
-        {/* The title is for screen readers only; the header shows the mark and three buttons. */}
+        <div className="flex items-center gap-2">
+          <a
+            href={websiteUrl('/', 'side-panel')}
+            target="_blank"
+            rel="noreferrer"
+            title={t('panel.website')}
+            aria-label={t('panel.website')}
+            className="flex items-center gap-1.5 rounded-lg p-0.5 transition-opacity hover:opacity-85 focus-visible:outline focus-visible:outline-2 focus-visible:outline-nb-accent">
+            <LogoMark size={22} />
+            <span className="text-xs font-semibold tracking-tight text-nb-fg">Mars</span>
+          </a>
+          <button
+            type="button"
+            onClick={() => setPromptDashboardOpen(true)}
+            title={`Active System Prompt: ${activePromptName} (Click to switch)`}
+            className="flex items-center gap-1.5 rounded-full border border-nb-border/60 bg-nb-surface/60 px-2.5 py-1 text-xs font-medium text-nb-muted transition-all hover:border-nb-accent/60 hover:bg-nb-surface hover:text-nb-fg">
+            <PromptIcon size={12} className="text-nb-accent" />
+            <span className="max-w-28 truncate">{activePromptName}</span>
+            <ChevronIcon size={10} className="text-nb-muted" />
+          </button>
+        </div>
+        {/* The title is for screen readers only; the header shows the mark and buttons. */}
         <h1 className="sr-only">{conversation?.title || t('panel.newChat')}</h1>
         <span className="flex-1" />
-        <IconButton
-          label="Save log for Notepad"
-          title="Save log file (.txt for Notepad)"
-          onClick={() => downloadLogForNotepad(state)}>
-          <FileIcon size={16} />
-        </IconButton>
-        <IconButton label={t('panel.newChat')} onClick={() => newChat(confirmNewChat)}>
-          <NewChatIcon />
-        </IconButton>
-        {/* Recent tasks opens once the conversation in this tab stops; other tabs' panels are free. */}
-        <IconButton
-          label={t('history.title')}
-          title={active ? t('history.busy') : undefined}
-          disabled={active}
-          onClick={() => setHistoryOpen(true)}>
-          <HistoryIcon />
-        </IconButton>
-        <IconButton label={t('panel.settings')} onClick={() => void chrome.runtime.openOptionsPage()}>
-          <SettingsIcon />
-        </IconButton>
+        <div className="flex items-center gap-0.5 rounded-xl border border-nb-border/50 bg-nb-surface/40 p-0.5 shadow-sm">
+          <IconButton
+            label="Save log for Notepad"
+            title="Save log file (.txt for Notepad)"
+            onClick={() => downloadLogForNotepad(state)}>
+            <FileIcon size={15} />
+          </IconButton>
+          <IconButton label={t('panel.newChat')} onClick={() => newChat(confirmNewChat)}>
+            <NewChatIcon size={15} />
+          </IconButton>
+          {/* Recent tasks opens once the conversation in this tab stops; other tabs' panels are free. */}
+          <IconButton
+            label={t('history.title')}
+            title={active ? t('history.busy') : undefined}
+            disabled={active}
+            onClick={() => setHistoryOpen(true)}>
+            <HistoryIcon size={15} />
+          </IconButton>
+          <IconButton label={t('panel.settings')} onClick={() => void chrome.runtime.openOptionsPage()}>
+            <SettingsIcon size={15} />
+          </IconButton>
+        </div>
       </header>
       {confirmNewChat ? (
         <div className="flex items-center gap-2 border-b border-amber-200 bg-amber-50 px-3 py-1.5 text-xs text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100">
@@ -508,11 +532,21 @@ export function App() {
           }
         />
       ) : (
-        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
-          <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center">
-            {state.loaded ? <LogoMark size={40} /> : null}
+        <div className="flex min-h-0 flex-1 flex-col justify-between overflow-y-auto px-4 py-6">
+          <div className="flex flex-1 flex-col items-center justify-center text-center">
             {state.loaded ? (
-              <p className="max-w-xs text-[24px] font-normal leading-tight text-nb-fg">{t('panel.empty')}</p>
+              <div className="group relative mb-4 flex items-center justify-center">
+                <div className="absolute -inset-1.5 rounded-2xl bg-gradient-to-r from-orange-500/20 via-amber-500/20 to-orange-500/10 blur-lg transition duration-500 group-hover:from-orange-500/30 group-hover:to-amber-500/30" />
+                <div className="relative flex size-14 items-center justify-center rounded-2xl border border-nb-border/60 bg-nb-surface/80 p-2.5 shadow-sm backdrop-blur-sm">
+                  <LogoMark size={34} />
+                </div>
+              </div>
+            ) : null}
+            {state.loaded ? (
+              <>
+                <h2 className="text-xl font-medium tracking-tight text-nb-fg">{t('panel.empty')}</h2>
+                <p className="mt-1 text-xs text-nb-muted">Ready to browse, research, or code on this tab</p>
+              </>
             ) : (
               <p className="text-sm text-nb-muted">{t('panel.loading')}</p>
             )}
@@ -520,20 +554,29 @@ export function App() {
           {/* With no model, the no-model card above the composer takes the quick start's place. */}
           {/* The quick start stays hidden while the What's new card shows. */}
           {state.loaded && models.length && !whatsNew ? (
-            <ul className="flex flex-col items-start gap-2 px-3 pb-2" aria-label={t('panel.starters')}>
-              {starters.map(s => (
-                <li key={s.key} className="max-w-full">
-                  <button
-                    type="button"
-                    title={s.title}
-                    disabled={!model}
-                    className="max-w-full truncate rounded-full border border-nb-border/60 bg-nb-bg px-4 py-2 text-[15px] text-nb-fg shadow-sm transition-colors hover:bg-nb-surface focus-visible:outline focus-visible:outline-2 focus-visible:outline-nb-accent disabled:opacity-40"
-                    onClick={s.run}>
-                    {s.label}
-                  </button>
-                </li>
-              ))}
-            </ul>
+            <div className="w-full pb-2">
+              <p className="mb-2 px-1 text-[11px] font-medium uppercase tracking-wider text-nb-muted/70">
+                {t('panel.starters')}
+              </p>
+              <ul className="flex flex-col gap-2" aria-label={t('panel.starters')}>
+                {starters.map(s => (
+                  <li key={s.key}>
+                    <button
+                      type="button"
+                      title={s.title}
+                      disabled={!model}
+                      className="group flex w-full items-center justify-between rounded-xl border border-nb-border/50 bg-nb-surface/30 px-3.5 py-2.5 text-left text-[13px] text-nb-fg shadow-sm transition-all duration-150 hover:border-nb-border hover:bg-nb-surface/80 hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-nb-accent disabled:opacity-40"
+                      onClick={s.run}>
+                      <span className="truncate pr-2 font-normal text-nb-fg group-hover:text-nb-fg">{s.label}</span>
+                      <ChevronIcon
+                        size={14}
+                        className="text-nb-muted/60 transition-transform duration-150 group-hover:translate-x-0.5 group-hover:text-nb-fg"
+                      />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
           ) : null}
         </div>
       )}
@@ -559,6 +602,11 @@ export function App() {
           if (remember) void settingsStorage.set(s => ({ ...s, agentTabsOnEnd: closeAgentTabs ? 'close' : 'keep' }));
           client?.send({ type: 'delete', conversationId: id, closeAgentTabs });
         }}
+      />
+      <PromptDashboard
+        open={promptDashboardOpen}
+        onOpenChange={setPromptDashboardOpen}
+        settings={settings}
       />
       <div role="status" aria-live="polite" className="sr-only">
         {t(`status.${state.status}`)}

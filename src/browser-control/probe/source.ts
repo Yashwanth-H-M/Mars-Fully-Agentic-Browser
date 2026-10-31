@@ -247,6 +247,17 @@ export function probeMain(): void {
   };
   const INTERACTIVE =
     'a[href], button, input, select, textarea, summary, [contenteditable=""], [contenteditable="true"], [tabindex]';
+  /** The top-level container element of a code editor (Ace, Monaco, CodeMirror) */
+  const EDITOR_CONTAINER_SEL =
+    '.ace_editor, .monaco-editor, .CodeMirror, .cm-editor, [data-mode-id], [data-editor], [class*="editor-container" i], [class*="code-editor" i], [class*="CodeEditor" i], [role="code"]';
+  /** Any element that is part of a code editor, including internal child elements */
+  const EDITOR_SEL =
+    '.ace_editor, .monaco-editor, .CodeMirror, .cm-editor, [data-mode-id], [data-editor], [class*="editor-container" i], [class*="code-editor" i], [class*="CodeEditor" i], [role="code"], .cm-scroller, .cm-content, .view-lines, [class*="monaco-"], [class*="monaco_"], [class*="CodeMirror"], [class*="cm-"], [class*="ace_"]';
+  /** Finds the enclosing editor container for an element, or the element itself if it is the container */
+  const editorContainerOf = (el: Element | null): Element | null => {
+    if (!el) return null;
+    return el.closest(EDITOR_CONTAINER_SEL) || el.closest('[class*="editor" i]') || (el.matches(EDITOR_CONTAINER_SEL) ? el : null);
+  };
   /**
    * A control of its own inside a target: native controls, links and the widget roles that activate. Content of an
    * editing host is text, not a control (Chrome does not follow a link there), and controls inside a shadow tree are
@@ -435,7 +446,8 @@ export function probeMain(): void {
       const contentEditable = (el as HTMLElement).isContentEditable === true;
       const enabled = !disabledByAncestor(el);
       const readOnly = textInput && (input.readOnly || el.getAttribute('aria-readonly') === 'true');
-      const editable = enabled && ((textInput && !readOnly) || contentEditable);
+      const isEditor = Boolean(editorContainerOf(el) || el.closest(EDITOR_SEL) || el.querySelector(EDITOR_SEL));
+      const editable = enabled && ((textInput && !readOnly) || contentEditable || isEditor);
       let checked: boolean | 'mixed' | null = null;
       if (tag === 'input' && (type === 'checkbox' || type === 'radio'))
         checked = input.indeterminate ? 'mixed' : input.checked;
@@ -475,10 +487,9 @@ export function probeMain(): void {
           const direct = a === el || own.activeElement === el;
           if (direct) return true;
           if (a && el.contains(a)) return true;
-          const EDITOR_SEL =
-            '.monaco-editor, .CodeMirror, .cm-editor, .cm-scroller, .cm-content, .ace_editor, [data-mode-id]';
-          const elEditor = el.closest(EDITOR_SEL);
-          return Boolean(elEditor && a && elEditor === a.closest(EDITOR_SEL));
+          const elContainer = editorContainerOf(el);
+          const aContainer = editorContainerOf(a);
+          return Boolean(elContainer && aContainer && (elContainer === aContainer || elContainer.contains(a)));
         })(),
       };
     },
@@ -823,17 +834,25 @@ export function probeMain(): void {
     },
 
     isEditor(el: Element) {
-      const EDITOR_SEL =
-        '.monaco-editor, .CodeMirror, .cm-editor, .cm-scroller, .cm-content, .ace_editor, [data-mode-id], [class*="monaco-"], [class*="CodeMirror"], [class*="ace_"], [class*="code-editor"]';
-      return !!el.closest(EDITOR_SEL);
+      return Boolean(editorContainerOf(el) || el.closest(EDITOR_SEL) || el.querySelector(EDITOR_SEL));
     },
 
     /** Selects the whole content of a focused field or editor, so the next insertion replaces it. */
     selectContents(el: Element) {
-      const EDITOR_SEL =
-        '.monaco-editor, .CodeMirror, .cm-editor, .cm-scroller, .cm-content, .ace_editor, [data-mode-id]';
-      if (el.closest(EDITOR_SEL)) {
+      const container = editorContainerOf(el) || el.closest(EDITOR_SEL) || el.querySelector(EDITOR_SEL);
+      if (container) {
+        const ace = (container as any).env?.editor || (el as any).env?.editor;
+        if (ace && typeof ace.selectAll === 'function') {
+          try {
+            ace.selectAll();
+            return true;
+          } catch {
+            // fallback
+          }
+        }
+        const input = (container as Element).querySelector('textarea, [contenteditable="true"]') ?? el;
         try {
+          (input as HTMLElement).focus?.();
           document.execCommand('selectAll');
           return true;
         } catch {
@@ -905,17 +924,64 @@ export function probeMain(): void {
     hitAccepts(target: Element, hit: Node) {
       // 1. Code editors and composite editor components (Monaco, CodeMirror, Ace):
       // The visual lines, scrollable elements, gutters and overlays are the visual presentation of the editor.
-      const EDITOR_SEL =
-        '.monaco-editor, .CodeMirror, .cm-editor, .cm-scroller, .cm-content, .ace_editor, [data-mode-id], [class*="monaco-"], [class*="monaco_"], [class*="CodeMirror"], [class*="cm-"], [class*="ace_"], [class*="code-editor"], [class*="CodeEditor"], [class*="editor-container"], [role="code"], [data-editor]';
-      const targetEditor = target.closest(EDITOR_SEL);
       const hitEl = hit.nodeType === 1 ? (hit as Element) : hit.parentElement;
-      const hitEditor = hitEl?.closest(EDITOR_SEL);
-      if (
-        targetEditor &&
-        hitEditor &&
-        (targetEditor === hitEditor || targetEditor.contains(hitEditor) || hitEditor.contains(targetEditor))
-      ) {
-        return { accepted: true, kind: 'inside' as const };
+      if (hitEl) {
+        // Ace Editor: gutters, content, cursor, and text-input all share the .ace_editor container
+        const isTargetAce = Boolean(
+          target.closest('[class*="ace_"]') ||
+          target.closest('.ace_editor') ||
+          target.matches('.ace_editor') ||
+          (target as any).env?.editor
+        );
+        const isHitAce = Boolean(
+          hitEl.closest('[class*="ace_"]') ||
+          hitEl.closest('.ace_editor') ||
+          hitEl.matches('.ace_editor') ||
+          (hitEl as any).env?.editor
+        );
+        if (isTargetAce && isHitAce) {
+          return { accepted: true, kind: 'inside' as const };
+        }
+
+        // Monaco Editor: lines, scrollable elements, margin overlays, and inputarea share .monaco-editor
+        const isTargetMonaco = Boolean(
+          target.closest('[class*="monaco-"]') ||
+          target.closest('.monaco-editor') ||
+          target.matches('.monaco-editor')
+        );
+        const isHitMonaco = Boolean(
+          hitEl.closest('[class*="monaco-"]') ||
+          hitEl.closest('.monaco-editor') ||
+          hitEl.matches('.monaco-editor')
+        );
+        if (isTargetMonaco && isHitMonaco) {
+          return { accepted: true, kind: 'inside' as const };
+        }
+
+        // CodeMirror Editor
+        const isTargetCm = Boolean(
+          target.closest('[class*="CodeMirror"], [class*="cm-"]') ||
+          target.closest('.CodeMirror, .cm-editor')
+        );
+        const isHitCm = Boolean(
+          hitEl.closest('[class*="CodeMirror"], [class*="cm-"]') ||
+          hitEl.closest('.CodeMirror, .cm-editor')
+        );
+        if (isTargetCm && isHitCm) {
+          return { accepted: true, kind: 'inside' as const };
+        }
+
+        // Generic code editor containers
+        const targetContainer = editorContainerOf(target);
+        const hitContainer = editorContainerOf(hitEl);
+        if (
+          targetContainer &&
+          (targetContainer === hitContainer ||
+            (hitContainer && (targetContainer.contains(hitContainer) || hitContainer.contains(targetContainer))) ||
+            targetContainer.contains(hitEl))
+        ) {
+          return { accepted: true, kind: 'inside' as const };
+        }
       }
 
       // 2. Custom text entry and editor wrappers:
@@ -977,9 +1043,7 @@ export function probeMain(): void {
     armGuard(target: Element, mode: 'pointer' | 'text', lifetimeMs = 4000, unfocused = false) {
       guard?.remove();
       const roots = rootsOf(target);
-      const EDITOR_SEL =
-        '.monaco-editor, .CodeMirror, .cm-editor, .cm-scroller, .cm-content, .ace_editor, [data-mode-id], [class*="monaco-"], [class*="monaco_"], [class*="CodeMirror"], [class*="cm-"], [class*="ace_"], [class*="code-editor"], [class*="CodeEditor"], [class*="editor-container"], [role="code"], [data-editor]';
-      const targetEditor = target.closest(EDITOR_SEL);
+      const targetContainer = editorContainerOf(target);
       // The document guard's target is the body: no focused element at all also counts as the body.
       const accepts = (hit: Element | null) =>
         hit === target ||
@@ -988,8 +1052,23 @@ export function probeMain(): void {
           hit.contains(target) &&
           (target.tagName === 'TEXTAREA' || target.tagName === 'INPUT' || (target as HTMLElement).isContentEditable)) ||
         (hit !== null &&
-          targetEditor !== null &&
-          (targetEditor === hit.closest(EDITOR_SEL) || targetEditor.contains(hit))) ||
+          targetContainer !== null &&
+          (targetContainer === editorContainerOf(hit) || targetContainer.contains(hit))) ||
+        (hit !== null &&
+          Boolean(
+            (target.closest('[class*="ace_"]') || target.closest('.ace_editor') || target.matches('.ace_editor')) &&
+            (hit.closest('[class*="ace_"]') || hit.closest('.ace_editor') || hit.matches('.ace_editor'))
+          )) ||
+        (hit !== null &&
+          Boolean(
+            (target.closest('[class*="monaco-"]') || target.closest('.monaco-editor') || target.matches('.monaco-editor')) &&
+            (hit.closest('[class*="monaco-"]') || hit.closest('.monaco-editor') || hit.matches('.monaco-editor'))
+          )) ||
+        (hit !== null &&
+          Boolean(
+            (target.closest('[class*="CodeMirror"], [class*="cm-"]') || target.closest('.CodeMirror, .cm-editor')) &&
+            (hit.closest('[class*="CodeMirror"], [class*="cm-"]') || hit.closest('.CodeMirror, .cm-editor'))
+          )) ||
         (unfocused && (!hit || hit === document.documentElement));
       const report: GuardReport =
         mode === 'text'

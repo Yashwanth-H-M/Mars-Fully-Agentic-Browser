@@ -80,7 +80,7 @@ export function ModelMenu({
     // when focus leaves it, so Escape never reaches the panel's Stop while it stays open.
     <div
       ref={root}
-      className="flex min-w-0 shrink-[2]"
+      className="flex min-w-0 max-w-[170px] shrink"
       onBlur={e => {
         if (open && !root.current?.contains(e.relatedTarget as Node | null)) setOpen(false);
       }}>
@@ -93,14 +93,16 @@ export function ModelMenu({
         aria-expanded={open}
         data-label={t('composer.model')}
         data-value={model ? valueOf(model) : ''}
-        className="flex min-w-0 items-center gap-1 rounded-full border border-transparent px-2 py-1 text-xs text-nb-muted hover:border-nb-border hover:text-nb-fg focus:outline-none focus-visible:ring-2 focus-visible:ring-nb-accent/40 disabled:hover:border-transparent disabled:hover:text-nb-muted"
+        className="flex min-w-0 items-center gap-1 rounded-full border border-nb-border/60 bg-nb-surface/60 px-2.5 py-1 text-xs font-medium text-nb-fg transition-colors hover:border-nb-border hover:bg-nb-surface focus:outline-none focus-visible:ring-2 focus-visible:ring-nb-accent/40 disabled:hover:border-transparent disabled:hover:text-nb-muted"
         onClick={() => setOpen(o => !o)}>
-        <span className="truncate">{label}</span>
-        {/* In a narrow panel the effort goes first, then the name is cut. */}
-        {showEffort && row ? (
-          <span className="shrink-0 whitespace-nowrap max-[340px]:hidden">· {t(`reasoning.${row.shown}`)}</span>
+        <span className="min-w-0 truncate">{label}</span>
+        {/* The effort pill shows when space permits */}
+        {showEffort && row && row.shown !== 'none' ? (
+          <span className="hidden shrink-0 text-[10px] text-nb-muted min-[340px]:inline">
+            · {t(`reasoning.${row.shown}`)}
+          </span>
         ) : null}
-        <ChevronIcon size={12} className={`shrink-0 transition-transform ${open ? '-rotate-90' : 'rotate-90'}`} />
+        <ChevronIcon size={11} className={`shrink-0 transition-transform ${open ? '-rotate-90' : 'rotate-90'}`} />
       </button>
       {open ? (
         <div

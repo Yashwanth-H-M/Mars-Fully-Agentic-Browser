@@ -83,6 +83,24 @@ interface ActiveRun {
   loop?: AgentLoop;
 }
 
+function resolveSystemPrompt(settings: typeof DEFAULT_SETTINGS, tools: ReturnType<typeof toolsForRun>): string {
+  const presets = settings.customPrompts?.length ? settings.customPrompts : DEFAULT_SETTINGS.customPrompts;
+  const activePreset = presets.find(p => p.id === (settings.activePromptId || 'default'));
+  const promptOverride =
+    activePreset && activePreset.id !== 'default' && activePreset.prompt?.trim()
+      ? activePreset.prompt.trim()
+      : undefined;
+
+  return (
+    promptOverride ??
+    agentSystemPrompt({
+      responseLanguage: settings.responseLanguage,
+      tools: tools.map(t => t.name),
+      customInstructions: settings.customInstructions,
+    })
+  );
+}
+
 export class RunManager {
   readonly journal = new Journal();
   readonly permissions = new Permissions();
@@ -286,7 +304,7 @@ export class RunManager {
           if (how === 'page-opened' && !watching) await this.scope.restoreView(tabId);
         })();
       },
-    });
+    }, this.border);
     this.#sessions.set(conversationId, session);
     for (const tabId of await this.scope.tabsOf(conversationId)) {
       // A tab on a blocked site stays out; the run says so through the layer's refusals.
@@ -1131,11 +1149,7 @@ export class RunManager {
       const model = await resolveModel(await livePair(conversationId));
       const settings = (await settingsStorage.get()) ?? DEFAULT_SETTINGS;
       const tools = toolsForRun({ vision: model.profile.vision });
-      const system = agentSystemPrompt({
-        responseLanguage: settings.responseLanguage,
-        tools: tools.map(t => t.name),
-        customInstructions: settings.customInstructions,
-      });
+      const system = resolveSystemPrompt(settings, tools);
       const unverified = new Set(((await getRun(conversationId))?.debt ?? []).map(d => d.toolCallId));
       const result = await runCompaction({
         conversationId,
@@ -1305,11 +1319,7 @@ export class RunManager {
           runId,
           startedAt: record.startedAt,
           model,
-          system: agentSystemPrompt({
-            responseLanguage: settings.responseLanguage,
-            tools: tools.map(t => t.name),
-            customInstructions: settings.customInstructions,
-          }),
+          system: resolveSystemPrompt(settings, tools),
           tools,
           mode: () => this.#modes.get(conversationId) ?? conversation.mode,
           layer: layerPort(session, this.border),

@@ -44,6 +44,14 @@ export const PlusIcon = (p: IconProps) => (
   </Svg>
 );
 
+/** System Prompts: command prompt / terminal symbol >_ */
+export const PromptIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <polyline points="4 17 10 11 4 5" />
+    <line x1="12" y1="19" x2="20" y2="19" />
+  </Svg>
+);
+
 export const SettingsIcon = (p: IconProps) => (
   <Svg {...p}>
     <path d="M18.8 9.7L21.4 10.1V13.9L18.8 14.3L18.4 15.2L20 17.3L17.3 20L15.2 18.4L14.3 18.8L13.9 21.4H10.1L9.7 18.8L8.8 18.4L6.7 20L4 17.3L5.6 15.2L5.2 14.3L2.6 13.9V10.1L5.2 9.7L5.6 8.8L4 6.7L6.7 4L8.8 5.6L9.7 5.2L10.1 2.6H13.9L14.3 5.2L15.2 5.6L17.3 4L20 6.7L18.4 8.8Z" />

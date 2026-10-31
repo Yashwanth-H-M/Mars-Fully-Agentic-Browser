@@ -79,7 +79,9 @@ export function renderContent(roots: ONode[], format: 'markdown' | 'text'): stri
       n.role === 'option' ||
       n.role === 'menuitem'
     ) {
-      return push(n.children.length ? '' : n.name);
+      if (!n.children.length) return push(n.name);
+      n.children.forEach(c => walk(c, listDepth));
+      return;
     }
     if (BLOCK_CONTAINERS.has(n.role) && n.children.length) {
       if (lines.length && lines[lines.length - 1] !== '') lines.push('');

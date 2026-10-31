@@ -86,7 +86,15 @@ async function focusForText(ctx: ToolContext, target: ResolvedTarget, timeoutMs?
   let state = await stateOf(ctx, target).catch(() => null);
   if (state?.focused) return;
 
-  const actionable = await waitForActionable(ctx, target, { pointer: true, editable: true, budgetMs: timeoutMs });
+  const isEditor = Boolean(
+    (await ctx
+      .tab()
+      .probe?.call<boolean>(target.frame, target.objectId, 'isEditor')
+      .catch(() => false)) ||
+    state?.tag === 'textarea' ||
+    target.record.print.role === 'textbox'
+  );
+  const actionable = await waitForActionable(ctx, target, { pointer: !isEditor, editable: true, budgetMs: timeoutMs });
   state = await stateOf(ctx, target);
   if (!state.focused) {
     const click = await dispatchClick(ctx, target, actionable.point, {});
@@ -753,6 +761,13 @@ export async function set(ctx: ToolContext, args: SetArgs): Promise<ToolOutcome>
       );
     }
     if (state.editable || state.contentEditable || state.tag === 'input' || state.tag === 'textarea') {
+      const isEditor = Boolean(
+        (await ctx.tab().probe?.call<boolean>(target.frame, target.objectId, 'isEditor').catch(() => false)) ||
+        state.tag === 'textarea' ||
+        target.record.print.role === 'textbox'
+      );
+      const isFocused = state.focused;
+      const needsPointer = !isEditor && !isFocused;
       const gated = await gateOn(
         ctx,
         target,
@@ -760,7 +775,7 @@ export async function set(ctx: ToolContext, args: SetArgs): Promise<ToolOutcome>
         args.submit ? 'enter' : 'none',
         args.intent,
         {
-          pointer: true,
+          pointer: needsPointer,
           editable: true,
           budgetMs: args.timeoutMs,
         },
@@ -804,7 +819,15 @@ export async function type(ctx: ToolContext, args: TypeArgs): Promise<ToolOutcom
     let mode: KeyMode = 'none';
     if (target) {
       // The target is editable: Space types a space, Enter may submit its form.
-      mode = args.submit ? 'enter' : typedMode(args.text, false, await stateOf(ctx, target));
+      const state = await stateOf(ctx, target);
+      mode = args.submit ? 'enter' : typedMode(args.text, false, state);
+      const isEditor = Boolean(
+        (await ctx.tab().probe?.call<boolean>(target.frame, target.objectId, 'isEditor').catch(() => false)) ||
+        state.tag === 'textarea' ||
+        target.record.print.role === 'textbox'
+      );
+      const isFocused = state.focused;
+      const needsPointer = !isEditor && !isFocused;
       const gated = await gateOn(
         ctx,
         target,
@@ -812,7 +835,7 @@ export async function type(ctx: ToolContext, args: TypeArgs): Promise<ToolOutcom
         mode,
         args.intent,
         {
-          pointer: true,
+          pointer: needsPointer,
           editable: true,
           budgetMs: args.timeoutMs,
         },

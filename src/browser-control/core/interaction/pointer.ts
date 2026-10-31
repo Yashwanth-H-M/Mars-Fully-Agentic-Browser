@@ -233,6 +233,15 @@ export async function dispatchClick(
   const base = { x: point.x, y: point.y, modifiers: modifierMask(options.modifiers), button: options.button ?? 'left' };
   const count = options.count ?? 1;
   tab.actionSeq++;
+  if (ctx.tabId) {
+    ctx.session.hooks.onCursor?.(ctx.tabId, {
+      id: 'mars',
+      x: point.x,
+      y: point.y,
+      action: 'click',
+      label: 'Click',
+    });
+  }
   let dispatched: boolean | 'unknown' = false;
   try {
     await cdp.send(undefined, 'Input.dispatchMouseEvent', {
@@ -290,6 +299,15 @@ export async function dispatchClick(
 export async function dispatchHover(ctx: ToolContext, point: Point): Promise<PointerOutcome> {
   const { cdp } = await ctx.attach();
   ctx.tab().actionSeq++;
+  if (ctx.tabId) {
+    ctx.session.hooks.onCursor?.(ctx.tabId, {
+      id: 'mars',
+      x: point.x,
+      y: point.y,
+      action: 'hover',
+      label: 'Hover',
+    });
+  }
   await cdp.send(undefined, 'Input.dispatchMouseEvent', { type: 'mouseMoved', x: point.x, y: point.y });
   return { dispatched: true };
 }
@@ -302,6 +320,15 @@ export async function dispatchWheel(
 ): Promise<PointerOutcome> {
   const { cdp } = await ctx.attach();
   ctx.tab().actionSeq++;
+  if (ctx.tabId) {
+    ctx.session.hooks.onCursor?.(ctx.tabId, {
+      id: 'mars',
+      x: point.x,
+      y: point.y,
+      action: 'scroll',
+      label: 'Scrolling',
+    });
+  }
   await cdp.send(undefined, 'Input.dispatchMouseEvent', { type: 'mouseWheel', x: point.x, y: point.y, deltaX, deltaY });
   return { dispatched: true };
 }

@@ -481,7 +481,7 @@ export function Composer({
           aria-label={t('composer.placeholder')}
           placeholder={t('composer.placeholder')}
           disabled={noModel}
-          className="max-h-[min(50vh,400px)] min-h-24 w-full resize-none bg-transparent px-3.5 pb-1 pt-3 text-[15px] placeholder:text-nb-muted focus:outline-none disabled:cursor-not-allowed"
+          className="max-h-[min(50vh,400px)] min-h-20 w-full resize-none bg-transparent px-3.5 pb-1 pt-3 text-[14px] leading-relaxed placeholder:text-nb-muted/70 focus:outline-none disabled:cursor-not-allowed"
           onChange={e => {
             setText(e.target.value);
             setRecall(null);
@@ -646,7 +646,7 @@ export function Composer({
           {active ? (
             <button
               type="button"
-              className="flex shrink-0 items-center gap-1 rounded-full bg-red-600 px-3 py-1.5 text-xs font-medium text-white shadow-sm hover:bg-red-700"
+              className="flex shrink-0 items-center gap-1 rounded-full bg-red-600 px-3 py-1.5 text-xs font-medium text-white shadow-sm transition-all hover:bg-red-700 active:scale-95"
               onClick={onStop}>
               <StopIcon size={13} />
               <span className="max-[279px]:sr-only">{t('composer.stop')}</span>
@@ -657,7 +657,7 @@ export function Composer({
               disabled={(!text.trim() && !files.length && !quotes.length) || !model}
               aria-label={t('composer.send')}
               title={t('composer.send')}
-              className="flex size-7 shrink-0 items-center justify-center rounded-full bg-nb-accent text-white shadow-sm transition-colors hover:bg-nb-accent-strong disabled:opacity-40 disabled:shadow-none disabled:hover:bg-nb-accent"
+              className="flex size-7 shrink-0 items-center justify-center rounded-full bg-nb-accent text-white shadow-sm transition-all hover:scale-105 hover:bg-nb-accent-strong active:scale-95 disabled:opacity-30 disabled:shadow-none disabled:hover:scale-100 disabled:hover:bg-nb-accent"
               onClick={send}>
               <SendIcon size={14} />
             </button>

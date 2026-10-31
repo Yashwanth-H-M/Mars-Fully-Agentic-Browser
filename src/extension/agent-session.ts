@@ -11,7 +11,11 @@ export const AGENT_LABELS = ['[Mars note', 'browser-state', 'agent-notes', 'cust
 /** ask_user waits 15 minutes in agent sessions: a person may be in another window. */
 export const ASK_TIMEOUT_MS = 15 * 60_000;
 
-export function createAgentSession(controller: Controller, config: SessionConfig = {}): Session {
+export function createAgentSession(
+  controller: Controller,
+  config: SessionConfig = {},
+  border?: Pick<PageBorder, 'cursor'>,
+): Session {
   return controller.createSession({
     capabilities: ['human', 'files'],
     // Files come from chat attachments only, never a path on the user's disk.
@@ -22,6 +26,10 @@ export function createAgentSession(controller: Controller, config: SessionConfig
     confirmTimeoutMs: Infinity,
     askTimeoutMs: ASK_TIMEOUT_MS,
     boundary: { labels: AGENT_LABELS },
+    onCursor: (tabId, data) => {
+      border?.cursor(tabId, data);
+      config.onCursor?.(tabId, data);
+    },
     ...config,
   });
 }
@@ -42,14 +50,39 @@ function dialogOpen(session: Session, tabId: number): boolean {
 }
 
 /** The loop's view of a session (src/agent/ports.ts). A screenshot fades the page border out first. */
-export function layerPort(session: Session, border?: Pick<PageBorder, 'around'>): LayerPort {
+export function layerPort(session: Session, border?: Pick<PageBorder, 'around' | 'cursor'>): LayerPort {
   return {
-    call: (tool, args, signal) => {
+    call: async (tool, args, signal) => {
+      const activeTab = session.activeTabId;
+      if (activeTab && border?.cursor) {
+        if (tool === 'click') border.cursor(activeTab, { id: 'mars', action: 'click', label: 'Clicking...' });
+        else if (tool === 'set' || tool === 'type' || tool === 'press')
+          border.cursor(activeTab, { id: 'mars', action: 'type', label: 'Typing...' });
+        else if (tool === 'scroll') border.cursor(activeTab, { id: 'mars', action: 'scroll', label: 'Scrolling...' });
+        else if (tool === 'hover') border.cursor(activeTab, { id: 'mars', action: 'hover', label: 'Hovering...' });
+        else if (tool === 'snapshot' || tool === 'observe')
+          border.cursor(activeTab, { id: 'mars', action: 'read', label: 'Observing...' });
+        else if (tool === 'wait') border.cursor(activeTab, { id: 'mars', action: 'wait', label: 'Waiting...' });
+      }
+
       const run = () => session.call(tool, args, { signal });
-      if (tool !== 'screenshot' || !border) return run();
-      const tabId = screenshotTab(session, args);
-      if (tabId === null || dialogOpen(session, tabId)) return run();
-      return border.around(tabId, run);
+      let result;
+      if (tool === 'screenshot' && border) {
+        const tabId = screenshotTab(session, args);
+        if (tabId === null || dialogOpen(session, tabId)) result = await run();
+        else result = await border.around(tabId, run);
+      } else {
+        result = await run();
+      }
+
+      if (activeTab && border?.cursor && result?.data && typeof result.data === 'object' && 'point' in result.data) {
+        const pt = (result.data as { point?: { x: number; y: number } }).point;
+        if (pt && typeof pt.x === 'number' && typeof pt.y === 'number') {
+          border.cursor(activeTab, { id: 'mars', x: pt.x, y: pt.y, action: tool, label: 'Mars' });
+        }
+      }
+
+      return result;
     },
     async tabs() {
       const result = await session.call('tabs', { action: 'list' });

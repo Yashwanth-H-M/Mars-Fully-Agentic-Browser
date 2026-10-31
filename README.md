@@ -35,6 +35,9 @@ Unlike traditional slow web agents that take minutes to click through forms, Mar
 * **Zero-Lag Navigation:** Smart lifecycle detection moves on as soon as document rendering stabilizes, never freezing on persistent background network requests.
 
 ### 🧠 True Autonomous Agentic Power
+* **Independent Visual Overlay Cursors:** Real-time visual secondary cursor rendering the agent's exact interactions (clicks, smooth hovers, scroll ripples, action badges). Completely decoupled from your physical mouse/keyboard—you can browse freely without interrupting the agent. Supports multi-cursor visualization for parallel workflows and automatically fades out during vision screenshots so models see a clean page.
+* **Dynamic Prompt Dashboard & Multi-Persona System Prompts:** Quick-switch UI right inside the composer to create, isolate, and switch between customized system prompts (e.g., Coding Practice Assistant, Deep Research, Web Scraping, Form Auto-fill) without touching or polluting the hardcoded core agent instructions.
+* **Flawless Coding Platform Compatibility:** Built-in intelligence for online code editors (LeetCode, HackerRank, CodeChef, NxtWave/SGU). Strictly preserves prefilled method signatures, boilerplate wrappers, and exact casing (`Solution` vs `solution`) without corrupting starter templates.
 * **Multi-Tab Orchestration:** Mars can manage, switch between, and coordinate parallel workflows across dedicated tab groups while you continue browsing undisturbed.
 * **Stable Element Ref Registry:** In-page isolated probes assign stable identifiers (`[e1]`, `[e2]`) based on Chrome's native accessibility tree. If the page shifts or reflows, elements fail-closed rather than mis-clicking.
 * **Verification Debt Tracking:** Mars doesn't just guess that an action worked—it deterministically inspects DOM mutations, URL changes, and HTTP network side-effects to prove that the task succeeded before finishing.
@@ -143,7 +146,8 @@ Mars is structured into two clean, decoupled architectural layers:
 ```
 ┌──────────────────────────────────────────────────────────────────┐
 │                   Mars Extension Agent Layer                     │
-│  - Side Panel React 18 UI with live streaming & activity pill   │
+│  - Frontier UI: Prompt Dashboard, Glassmorphic Composer, Modes   │
+│  - Independent Visual Multi-Cursor Engine (zero user collision)  │
 │  - One agent loop per conversation with dynamic debt clearing    │
 │  - Context compaction & prefix caching stability                 │
 │  - Multi-provider Vercel AI SDK integration                     │

@@ -78,6 +78,16 @@ export interface SessionConfig {
    * user's disk.
    */
   uploadSources?: Array<'paths' | 'attachments'>;
+  /** Broadcasts cursor movements and actions to the host for visual overlays. */
+  onCursor?: (tabId: number, data: CursorEvent) => void;
+}
+
+export interface CursorEvent {
+  id?: string;
+  x?: number;
+  y?: number;
+  action?: string;
+  label?: string;
 }
 
 export interface AuditEntry {
@@ -464,10 +474,18 @@ export class Session {
   readonly config: Required<
     Omit<
       SessionConfig,
-      'capabilities' | 'urlPolicy' | 'confirm' | 'boundary' | 'handover' | 'decideWrite' | 'reveal' | 'onTabJoined'
+      | 'capabilities'
+      | 'urlPolicy'
+      | 'confirm'
+      | 'boundary'
+      | 'handover'
+      | 'decideWrite'
+      | 'reveal'
+      | 'onTabJoined'
+      | 'onCursor'
     >
   >;
-  readonly hooks: Pick<SessionConfig, 'reveal' | 'onTabJoined'>;
+  readonly hooks: Pick<SessionConfig, 'reveal' | 'onTabJoined' | 'onCursor'>;
   readonly decideWrite: SessionConfig['decideWrite'];
   /** Fixed when the session is made: a session never gains or loses its hand-over policy. */
   readonly handover: boolean;
@@ -486,7 +504,7 @@ export class Session {
   ) {
     this.handover = config.handover ?? false;
     this.decideWrite = config.decideWrite;
-    this.hooks = { reveal: config.reveal, onTabJoined: config.onTabJoined };
+    this.hooks = { reveal: config.reveal, onTabJoined: config.onTabJoined, onCursor: config.onCursor };
     this.capabilities = new Set(this.#allowed(config.capabilities ?? []));
     this.config = {
       observeDefault: config.observeDefault ?? 'none',

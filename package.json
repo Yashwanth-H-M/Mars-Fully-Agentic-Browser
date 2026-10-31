@@ -4,6 +4,14 @@
   "private": true,
   "description": "Mars: Fully Agentic AI Browser",
   "author": "Yashwanth H M",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Yashwanth-H-M/Mars-Fully-Agentic-Browser.git"
+  },
+  "homepage": "https://github.com/Yashwanth-H-M/Mars-Fully-Agentic-Browser#readme",
+  "bugs": {
+    "url": "https://github.com/Yashwanth-H-M/Mars-Fully-Agentic-Browser/issues"
+  },
   "license": "Apache-2.0",
   "type": "module",
   "scripts": {
