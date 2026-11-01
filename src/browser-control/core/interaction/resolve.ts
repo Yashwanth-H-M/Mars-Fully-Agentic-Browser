@@ -44,6 +44,31 @@ function asShown(ctx: ToolContext, observation: Observation, ref: string): RefRe
   return shown ? { ...record, ...shown } : record;
 }
 
+function textMatches(nodeName: string, query: string, isControl: boolean): boolean {
+  if (!nodeName || !query) return false;
+  const n = nodeName.trim().toLowerCase();
+  const q = query.trim().toLowerCase();
+  if (n === q) return true;
+
+  // For very short queries (e.g. "2" or "18"), match on word boundaries only for controls
+  if (q.length <= 5) {
+    if (!isControl || n.length > 20) return false;
+    const wordRegex = new RegExp(`(^|\\s|[.,;:-])${q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}($|\\s|[.,;:-])`, 'i');
+    return wordRegex.test(n);
+  }
+
+  const cleanNode = n.replace(/(?:\.{3}|…)+$/, '').trim();
+  const cleanQuery = q.replace(/(?:\.{3}|…)+$/, '').trim();
+  if (cleanNode === cleanQuery) return true;
+  if (cleanNode.length >= 6 && (cleanQuery.startsWith(cleanNode) || cleanNode.startsWith(cleanQuery))) return true;
+  if (cleanNode.includes(cleanQuery) || cleanQuery.includes(cleanNode)) return true;
+  if (cleanQuery.length > 25) {
+    const prefix = cleanQuery.slice(0, 30);
+    if (cleanNode.includes(prefix)) return true;
+  }
+  return false;
+}
+
 /**
  * The ref of the one actionable node a semantic target names; it refuses to guess. `fresh` takes a new capture instead
  * of reusing a recent one, for `wait`, which looks for a change the page made on its own.
@@ -69,59 +94,16 @@ async function resolveSemantic(
   const role = target.role?.toLowerCase();
   const name = searchName === undefined ? undefined : cleanText(searchName);
   const matches: ONode[] = [];
-  walk(roots, n => {
+  const nodeAncestors = new Map<string, Set<string>>();
+  walk(roots, (n, ancestors) => {
     if (!n.ref) return;
+    nodeAncestors.set(n.ref, new Set(ancestors.map(a => a.ref).filter((r): r is string => Boolean(r))));
     if (role && role !== 'text' && n.role.toLowerCase() !== role && n.rawRole.toLowerCase() !== role) return;
     if (name !== undefined) {
-      const cleanNodeName = (n.name ?? '').trim().toLowerCase();
-      const targetQuery = name.trim().toLowerCase();
-      const isControl = ['radio', 'checkbox', 'button', 'option', 'menuitemradio', 'menuitemcheckbox', 'link'].includes(
+      const isControl = ['radio', 'checkbox', 'button', 'option', 'clickable', 'menuitemradio', 'menuitemcheckbox', 'link'].includes(
         n.role.toLowerCase(),
       );
-      if (cleanNodeName === targetQuery) {
-        matches.push(n);
-        return;
-      }
-      // If query is short (e.g. "2" or "18"), do not match layout containers or non-interactive divs
-      if (targetQuery.length <= 5 && !isControl) return;
-      if (targetQuery.length <= 5 && cleanNodeName.length > 20) return;
-      // Word boundary match:
-      const wordRegex = new RegExp(
-        `(^|\\s|[.,;:-])${targetQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}($|\\s|[.,;:-])`,
-        'i',
-      );
-      if (wordRegex.test(cleanNodeName)) {
-        matches.push(n);
-        return;
-      }
-      if (cleanNodeName.includes(targetQuery) && cleanNodeName.length < 50 && isControl) {
-        matches.push(n);
-        return;
-      }
-      const nodeNoEllipsis = cleanNodeName.replace(/(?:\.{3}|…)+$/, '').trim();
-      const queryNoEllipsis = targetQuery.replace(/(?:\.{3}|…)+$/, '').trim();
-      if (
-        nodeNoEllipsis.length >= 6 &&
-        (targetQuery.startsWith(nodeNoEllipsis) || cleanNodeName.startsWith(queryNoEllipsis))
-      ) {
-        matches.push(n);
-        return;
-      }
-      if (
-        queryNoEllipsis.length >= 6 &&
-        (cleanNodeName.includes(queryNoEllipsis) || targetQuery.includes(nodeNoEllipsis))
-      ) {
-        matches.push(n);
-        return;
-      }
-      if (queryNoEllipsis.length > 25) {
-        const queryPrefix = queryNoEllipsis.slice(0, 30);
-        if (cleanNodeName.includes(queryPrefix)) {
-          matches.push(n);
-          return;
-        }
-      }
-      return;
+      if (!textMatches(n.name ?? '', name, isControl)) return;
     }
     matches.push(n);
   });
@@ -146,31 +128,47 @@ async function resolveSemantic(
     return asShown(ctx, observation, pick.ref!);
   }
   if (matches.length > 1) {
-    const radios = matches.filter(m => ['radio', 'checkbox', 'menuitemradio'].includes(m.role.toLowerCase()));
+    // 1. If matches contain an ancestor container and its descendants, eliminate the ancestor wrappers
+    const nonAncestors = matches.filter(m => {
+      const mRef = m.ref!;
+      return !matches.some(other => other !== m && nodeAncestors.get(other.ref!)?.has(mRef));
+    });
+    if (nonAncestors.length === 1) {
+      return asShown(ctx, observation, nonAncestors[0].ref!);
+    }
+    const candidateMatches = nonAncestors.length > 0 ? nonAncestors : matches;
+
+    const radios = candidateMatches.filter(m =>
+      ['radio', 'checkbox', 'menuitemradio'].includes(m.role.toLowerCase()),
+    );
     if (radios.length === 1) {
       return asShown(ctx, observation, radios[0].ref!);
     }
-    const interactive = matches.filter(m =>
-      ['radio', 'checkbox', 'button', 'option', 'menuitemradio', 'menuitemcheckbox'].includes(m.role.toLowerCase()),
+    const interactive = candidateMatches.filter(m =>
+      ['radio', 'checkbox', 'button', 'option', 'clickable', 'menuitemradio', 'menuitemcheckbox', 'link'].includes(
+        m.role.toLowerCase(),
+      ),
     );
     if (interactive.length === 1) {
       return asShown(ctx, observation, interactive[0].ref!);
     }
     const exact =
       name !== undefined
-        ? matches.filter(m => (m.name ?? '').trim().toLowerCase() === name.trim().toLowerCase())
-        : matches;
+        ? candidateMatches.filter(m => (m.name ?? '').trim().toLowerCase() === name.trim().toLowerCase())
+        : candidateMatches;
     if (exact.length === 1) {
       return asShown(ctx, observation, exact[0].ref!);
     }
-    const exactRadios = exact.filter(m => ['radio', 'checkbox'].includes(m.role.toLowerCase()));
+    const exactRadios = exact.filter(m =>
+      ['radio', 'checkbox', 'clickable', 'option'].includes(m.role.toLowerCase()),
+    );
     if (exactRadios.length === 1) {
       return asShown(ctx, observation, exactRadios[0].ref!);
     }
-    const list = matches.slice(0, 10).map(m => `[${m.ref}] ${m.role} ${quote(m.name, 60)}`);
+    const list = candidateMatches.slice(0, 10).map(m => `[${m.ref}] ${m.role} ${quote(m.name, 60)}`);
     throw new LayerError(
       'AMBIGUOUS_TARGET',
-      `${matches.length} elements match ${label}: ${list.join(', ')}${matches.length > 10 ? ', …' : ''}`,
+      `${candidateMatches.length} elements match ${label}: ${list.join(', ')}${candidateMatches.length > 10 ? ', …' : ''}`,
     );
   }
   return asShown(ctx, observation, matches[0].ref!);
@@ -364,6 +362,9 @@ async function resolveByText(ctx: ToolContext, text: string, nth = 0): Promise<R
             if (matchesTarget(r.value) || matchesTarget(r.getAttribute('aria-label'))) return r;
             let cur = r.parentElement;
             for (let d = 0; d < 4 && cur && cur !== document.body; d++) {
+              // Stop if climbing up to a parent container that holds other radio options
+              const radiosInside = cur.querySelectorAll('input[type="radio"], input[type="checkbox"], [role="radio"], [role="checkbox"]');
+              if (radiosInside.length > 1) break;
               if (matchesTarget(cur.innerText || cur.textContent)) return r;
               cur = cur.parentElement;
             }
@@ -405,8 +406,9 @@ async function resolveByText(ctx: ToolContext, text: string, nth = 0): Promise<R
             const pick = exact[${nth}] || exact[0];
             let cur = pick;
             for (let d = 0; d < 4 && cur && cur !== document.body; d++) {
-              const nearbyRadio = cur.querySelector('input[type="radio"], input[type="checkbox"], [role="radio"], [role="checkbox"]');
-              if (nearbyRadio) return nearbyRadio;
+              const nearbyRadios = cur.querySelectorAll('input[type="radio"], input[type="checkbox"], [role="radio"], [role="checkbox"]');
+              if (nearbyRadios.length === 1) return nearbyRadios[0];
+              if (nearbyRadios.length > 1) break;
               cur = cur.parentElement;
             }
             return pick;
