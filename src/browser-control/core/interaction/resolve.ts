@@ -98,6 +98,15 @@ async function resolveSemantic(
         matches.push(n);
         return;
       }
+      const nodeNoEllipsis = cleanNodeName.replace(/\.{3}$|…$/, '').trim();
+      const queryNoEllipsis = targetQuery.replace(/\.{3}$|…$/, '').trim();
+      if (
+        nodeNoEllipsis.length >= 6 &&
+        (targetQuery.startsWith(nodeNoEllipsis) || cleanNodeName.startsWith(queryNoEllipsis))
+      ) {
+        matches.push(n);
+        return;
+      }
       return;
     }
     matches.push(n);

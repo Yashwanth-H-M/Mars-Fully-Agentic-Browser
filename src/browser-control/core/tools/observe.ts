@@ -168,14 +168,30 @@ export async function find(ctx: ToolContext, args: FindArgs): Promise<ToolOutcom
     roots = node.children;
   }
   const role = args.role?.toLowerCase();
-  const name = args.name ? cleanText(args.name).toLowerCase() : undefined;
-  const text = args.text ? cleanText(args.text).toLowerCase() : undefined;
-  const matches = actionableNodes(roots).filter(
-    n =>
-      (!role || n.role.toLowerCase() === role || n.rawRole.toLowerCase() === role) &&
-      (!name || n.name.toLowerCase().includes(name)) &&
-      (!text || n.name.toLowerCase().includes(text) || (!n.masked && (n.value ?? '').toLowerCase().includes(text))),
-  );
+  const cleanQ = (s: string) =>
+    cleanText(s)
+      .replace(/\.{3}$|…$/, '')
+      .trim()
+      .toLowerCase();
+  const name = args.name ? cleanQ(args.name) : undefined;
+  const text = args.text ? cleanQ(args.text) : undefined;
+  const matches = actionableNodes(roots).filter(n => {
+    if (role && n.role.toLowerCase() !== role && n.rawRole.toLowerCase() !== role) return false;
+    const cleanNName = cleanQ(n.name ?? '');
+    const cleanNVal = cleanQ(n.value ?? '');
+    const matchName =
+      !name ||
+      cleanNName.includes(name) ||
+      (name.length >= 4 && cleanNName.length >= 4 && (name.startsWith(cleanNName) || cleanNName.startsWith(name)));
+    const matchText =
+      !text ||
+      cleanNName.includes(text) ||
+      (text.length >= 4 && cleanNName.length >= 4 && (text.startsWith(cleanNName) || cleanNName.startsWith(text))) ||
+      (!n.masked &&
+        (cleanNVal.includes(text) ||
+          (text.length >= 4 && cleanNVal.length >= 4 && (text.startsWith(cleanNVal) || cleanNVal.startsWith(text)))));
+    return matchName && matchText;
+  });
   const limit = args.limit ?? 20;
   const shown = matches.slice(0, limit);
   // The baseline is what this observation shows, even when it is a reused one.
