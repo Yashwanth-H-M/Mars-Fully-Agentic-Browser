@@ -248,7 +248,7 @@ export function enrichFrame(
     if (isEditor && existing) {
       existing.role = 'textbox';
       existing.actionable = true;
-      if (!existing.name) existing.name = 'Code Editor';
+      existing.name = 'Code Editor';
     }
 
     if (existing?.actionable) {
@@ -262,7 +262,7 @@ export function enrichFrame(
     const parent = doc.byIndex[node.parent];
     const signal = layoutSignal(node, parent);
     if (!signal) continue;
-    if (insideActionable(node) && !isNativeControl(node) && !existing?.name) continue;
+    if (insideActionable(node) && !isNativeControl(node) && !existing?.name && !isEditor) continue;
 
     // Prune out large layout containers (divs, sections, headers, banners) that are not atomic controls
     const isContainerTag = [
@@ -281,14 +281,15 @@ export function enrichFrame(
     const hasAriaInteractive = ['button', 'link', 'radio', 'checkbox', 'tab', 'menuitem'].includes(
       node.attrs.role ?? '',
     );
-    if (isContainerTag && !hasAriaInteractive && !node.scrollable) {
+    if (isContainerTag && !hasAriaInteractive && !node.scrollable && !isEditor) {
       const textLen = (doc.text(node.index) || '').length;
       if (textLen > 35) continue;
     }
 
     const digest = doc.digest(node.index);
-    const name =
-      isRadioOrCheck && findOptionLabel(doc, node)
+    const name = isEditor
+      ? 'Code Editor'
+      : isRadioOrCheck && findOptionLabel(doc, node)
         ? findOptionLabel(doc, node)!
         : holdsValue(node)
           ? node.attrs['aria-label'] ||
@@ -304,12 +305,17 @@ export function enrichFrame(
       // An outline node without a ref (for example a named group) becomes actionable in place.
       existing.actionable = true;
       existing.layout = { tag: node.tag, digest, names: nameSources(doc, node) };
-      if (!existing.name) existing.name = name;
+      existing.name = isEditor ? 'Code Editor' : existing.name || name;
+      if (isEditor) existing.role = 'textbox';
     } else {
       splice(node, {
         kind: 'element',
         rawRole: `layout:${node.tag}`,
-        role: isRadioOrCheck ? node.attrs.type || node.attrs.role || 'radio' : layoutRole(node, signal),
+        role: isEditor
+          ? 'textbox'
+          : isRadioOrCheck
+            ? node.attrs.type || node.attrs.role || 'radio'
+            : layoutRole(node, signal),
         name,
         states: [],
         actionable: true,

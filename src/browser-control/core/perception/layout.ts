@@ -313,11 +313,16 @@ export function layoutSignal(node: LayoutNode, parent: LayoutNode | undefined): 
   if (node.clickable) return 'click listener';
   if (node.styles.cursor === 'pointer' && parent?.styles.cursor !== 'pointer') return 'pointer cursor';
   if (node.scrollable) return 'scrollable';
+  const cls = node.attrs.class ?? '';
+  if (/(monaco-editor|ace_editor|CodeMirror|cm-editor|code-editor)/i.test(cls) || 'data-mode-id' in node.attrs) {
+    return 'code editor';
+  }
   return null;
 }
 
 /** The role shown for a layout-only node: from its tag, or what it does. */
 export function layoutRole(node: LayoutNode, signal: string): string {
+  if (signal === 'code editor') return 'textbox';
   if (signal === 'scrollable') return 'scrollable';
   if (node.tag === 'input')
     return node.attrs.type === 'checkbox' ? 'checkbox' : node.attrs.type === 'radio' ? 'radio' : 'textbox';
