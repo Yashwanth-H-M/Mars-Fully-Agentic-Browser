@@ -80,15 +80,16 @@ export async function enableDomains(cdp: CdpPort, sessionId: SessionId, enabled:
     await Promise.all([cdp.send(sessionId, 'DOM.enable'), cdp.send(sessionId, 'Accessibility.enable')]);
     enabled.add(key);
   } catch (error) {
+    // If enabling fails (e.g. frame detached or navigated), ignore so capture can proceed gracefully.
     if (
+      sessionId !== undefined ||
       /-32001|session.*not found/i.test(String(error)) ||
       (isLayerError(error) && (error.code === 'FRAME_DETACHED' || error.code === 'DEBUGGER_DETACHED')) ||
-      sessionId !== undefined
+      isLayerError(error) ||
+      error instanceof Error
     ) {
       return;
     }
-    if (isLayerError(error)) return;
-    throw error;
   }
 }
 

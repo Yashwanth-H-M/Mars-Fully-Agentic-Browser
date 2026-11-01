@@ -337,6 +337,17 @@ async function resolveByText(ctx: ToolContext, text: string, nth = 0): Promise<R
             return false;
           };
 
+          // 0. Class / selector or BackButton match
+          if (rawTarget.includes('.') || rawTarget.includes('BackButton') || rawTarget.includes('#')) {
+            try {
+              const sel = rawTarget.startsWith('.') || rawTarget.startsWith('#')
+                ? rawTarget
+                : '.' + rawTarget.replace(/[\s.]+/g, '.');
+              const el = document.querySelector(sel);
+              if (el) return el;
+            } catch {}
+          }
+
           // 1. Labels with matching text
           const labels = Array.from(document.querySelectorAll('label'));
           for (const l of labels) {
@@ -359,9 +370,20 @@ async function resolveByText(ctx: ToolContext, text: string, nth = 0): Promise<R
           }
 
           // 3. Other interactive inputs/buttons
-          const inputs = Array.from(document.querySelectorAll('input, button, [role="button"], [role="option"]'));
+          const inputs = Array.from(document.querySelectorAll('input, button, [role="button"], [role="option"], a, [class*="Button"], [class*="btn"]'));
           for (const el of inputs) {
             if (matchesTarget(el.value) || matchesTarget(el.getAttribute('aria-label')) || matchesTarget(el.innerText || el.textContent)) {
+              return el;
+            }
+            if (el.className && typeof el.className === 'string') {
+              const cls = el.className.toLowerCase();
+              const normCls = cls.replace(/\s+/g, '.');
+              if (cls.includes(target) || normCls.includes(target) || target.includes(cls) || target.includes(normCls)) {
+                return el;
+              }
+            }
+            const testId = el.getAttribute('data-testid') || el.getAttribute('id');
+            if (testId && (testId.toLowerCase().includes(target) || target.includes(testId.toLowerCase()))) {
               return el;
             }
             const parent = el.closest('label') || el.closest('li') || el.parentElement;

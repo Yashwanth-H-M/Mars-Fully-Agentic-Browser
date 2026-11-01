@@ -151,17 +151,38 @@ async function checkOnce(ctx: ToolContext, target: ResolvedTarget, needs: Needs)
     undefined,
     'Page.getLayoutMetrics',
   );
-  if (
-    top.x < 0 ||
-    top.y < 0 ||
-    top.x >= metrics.cssLayoutViewport.clientWidth ||
-    top.y >= metrics.cssLayoutViewport.clientHeight
-  ) {
-    throw new LayerError('NOT_VISIBLE', `${name} is outside the visible part of the page`);
-  }
   let selectedPoint = b;
   let selectedChain = chain;
   let selectedTop = top;
+  if (
+    selectedTop.x < 0 ||
+    selectedTop.y < 0 ||
+    selectedTop.x >= metrics.cssLayoutViewport.clientWidth ||
+    selectedTop.y >= metrics.cssLayoutViewport.clientHeight
+  ) {
+    await cdp
+      .send(target.frame.sessionId, 'Runtime.callFunctionOn', {
+        objectId: target.objectId,
+        functionDeclaration:
+          'function() { if (this && this.scrollIntoView) this.scrollIntoView({ block: "center", inline: "center" }); }',
+      })
+      .catch(() => undefined);
+    const retryChain = await chainToTop(cdp, target.frames, target.frame, b, root =>
+      probe.callGlobal(root, 'viewport'),
+    ).catch(() => null);
+    if (retryChain && retryChain.length > 0) {
+      selectedChain = retryChain;
+      selectedTop = retryChain[retryChain.length - 1].point;
+    }
+    if (
+      selectedTop.x < 0 ||
+      selectedTop.y < 0 ||
+      selectedTop.x >= metrics.cssLayoutViewport.clientWidth ||
+      selectedTop.y >= metrics.cssLayoutViewport.clientHeight
+    ) {
+      throw new LayerError('NOT_VISIBLE', `${name} is outside the visible part of the page`);
+    }
+  }
   if (needs.pointer) {
     try {
       await hitTest(ctx, target, b, chain, !!needs.overControls);
