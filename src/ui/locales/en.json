@@ -193,6 +193,7 @@
   "act.screenshot": "Took a screenshot",
   "act.wait": "Waited",
   "act.click": "Clicked {target}",
+  "act.drag": "Dragged {target}",
   "act.set": "Set {target}",
   "act.type": "Typed into {target}",
   "act.press": "Pressed {keys}",

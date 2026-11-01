@@ -1,14 +1,14 @@
 // Pointer actions: click, hover, scroll.
 // Pipeline: resolve and revalidate → actionability (all retries here) → dispatch once → receipt and page state.
 import { LayerError } from '../../protocol/errors';
-import type { ClickArgs, HoverArgs, ScrollArgs, Target } from '../../protocol/schemas';
+import type { ClickArgs, DragArgs, HoverArgs, ScrollArgs, Target } from '../../protocol/schemas';
 import type { ActionReceipt } from '../../protocol/results';
 import type { ScrollInfo } from '../../probe';
 import type { ToolContext, ToolOutcome } from '../controller';
 import { resolveTarget } from '../interaction/resolve';
 import type { ResolvedTarget } from '../interaction/resolve';
 import { waitForActionable } from '../interaction/actionability';
-import { dispatchClick, dispatchHover, dispatchWheel } from '../interaction/pointer';
+import { dispatchClick, dispatchDrag, dispatchHover, dispatchWheel } from '../interaction/pointer';
 import { withEvidence } from '../interaction/evidence';
 import { preflightNavigation } from '../interaction/preflight';
 import { classifyOn, gateTarget } from '../interaction/gate';
@@ -138,6 +138,37 @@ export async function click(ctx: ToolContext, args: ClickArgs): Promise<ToolOutc
     } finally {
       if (target !== first) await releaseTarget(ctx, target);
     }
+  });
+}
+
+export async function drag(ctx: ToolContext, args: DragArgs): Promise<ToolOutcome> {
+  assertNoModal(ctx);
+  return withTarget(ctx, args.from, async fromTarget => {
+    return withTarget(ctx, args.to, async toTarget => {
+      const fromActionable = await waitForActionable(ctx, fromTarget, {
+        pointer: true,
+        budgetMs: args.timeoutMs,
+      });
+      const toActionable = await waitForActionable(ctx, toTarget, {
+        pointer: true,
+        budgetMs: args.timeoutMs,
+      });
+      const { outcome, evidence } = await withEvidence(ctx, fromTarget, args.expect, {}, () =>
+        dispatchDrag(ctx, fromActionable.point, toActionable.point),
+      );
+      const receipt: ActionReceipt = {
+        action: 'drag',
+        target: `[${fromTarget.record.ref}] ${fromTarget.description} -> [${toTarget.record.ref}] ${toTarget.description}`,
+        mechanism: 'pointer',
+        dispatched: outcome.dispatched,
+        effect: evidence.effect,
+        postcondition: evidence.postcondition,
+      };
+      return withPageState(ctx, args.observe, {
+        receipt,
+        data: { from: fromActionable.point, to: toActionable.point },
+      });
+    });
   });
 }
 

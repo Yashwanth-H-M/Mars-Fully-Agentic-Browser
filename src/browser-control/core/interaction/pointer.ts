@@ -312,6 +312,71 @@ export async function dispatchHover(ctx: ToolContext, point: Point): Promise<Poi
   return { dispatched: true };
 }
 
+export async function dispatchDrag(
+  ctx: ToolContext,
+  fromPoint: Point,
+  toPoint: Point,
+  steps = 8,
+): Promise<PointerOutcome> {
+  const { cdp } = await ctx.attach();
+  ctx.tab().actionSeq++;
+  if (ctx.tabId) {
+    ctx.session.hooks.onCursor?.(ctx.tabId, {
+      id: 'mars',
+      x: fromPoint.x,
+      y: fromPoint.y,
+      action: 'click',
+      label: 'Drag',
+    });
+  }
+  // Move to source position
+  await cdp.send(undefined, 'Input.dispatchMouseEvent', {
+    type: 'mouseMoved',
+    x: fromPoint.x,
+    y: fromPoint.y,
+  });
+  // Press left mouse button
+  await cdp.send(undefined, 'Input.dispatchMouseEvent', {
+    type: 'mousePressed',
+    button: 'left',
+    buttons: 1,
+    clickCount: 1,
+    x: fromPoint.x,
+    y: fromPoint.y,
+  });
+  // Move along the drag path in smooth steps
+  for (let i = 1; i <= steps; i++) {
+    const x = Math.round(fromPoint.x + (toPoint.x - fromPoint.x) * (i / steps));
+    const y = Math.round(fromPoint.y + (toPoint.y - fromPoint.y) * (i / steps));
+    await cdp.send(undefined, 'Input.dispatchMouseEvent', {
+      type: 'mouseMoved',
+      button: 'left',
+      buttons: 1,
+      x,
+      y,
+    });
+  }
+  // Release mouse button at destination
+  await cdp.send(undefined, 'Input.dispatchMouseEvent', {
+    type: 'mouseReleased',
+    button: 'left',
+    buttons: 0,
+    clickCount: 1,
+    x: toPoint.x,
+    y: toPoint.y,
+  });
+  if (ctx.tabId) {
+    ctx.session.hooks.onCursor?.(ctx.tabId, {
+      id: 'mars',
+      x: toPoint.x,
+      y: toPoint.y,
+      action: 'click',
+      label: 'Drop',
+    });
+  }
+  return { dispatched: true };
+}
+
 export async function dispatchWheel(
   ctx: ToolContext,
   point: Point,

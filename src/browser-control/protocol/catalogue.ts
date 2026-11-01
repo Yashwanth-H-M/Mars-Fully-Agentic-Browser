@@ -4,6 +4,7 @@ import { z } from 'zod';
 import {
   AskUserArgsSchema,
   ClickArgsSchema,
+  DragArgsSchema,
   FillFormArgsSchema,
   FindArgsSchema,
   HandleDialogArgsSchema,
@@ -76,6 +77,15 @@ export const TOOL_SPECS: ToolSpec[] = [
     description:
       'Click an element with trusted input after checking that it is visible, stable, enabled and not covered.',
     args: ClickArgsSchema,
+    readOnly: false,
+    capability: 'core',
+    available: true,
+  },
+  {
+    name: 'drag',
+    description:
+      'Drag an element and drop it onto another element. Useful for reordering items, matching, and drag-and-drop questions.',
+    args: DragArgsSchema,
     readOnly: false,
     capability: 'core',
     available: true,

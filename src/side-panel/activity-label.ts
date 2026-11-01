@@ -33,6 +33,7 @@ const LABELS: Record<string, MessageKey> = {
   screenshot: 'act.screenshot',
   wait: 'act.wait',
   click: 'act.click',
+  drag: 'act.drag',
   set: 'act.set',
   type: 'act.type',
   press: 'act.press',

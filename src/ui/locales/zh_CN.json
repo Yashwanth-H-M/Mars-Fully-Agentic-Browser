@@ -193,6 +193,7 @@
   "act.screenshot": "截取了屏幕截图",
   "act.wait": "等待了",
   "act.click": "点击了 {target}",
+  "act.drag": "拖拽了 {target}",
   "act.set": "设置了 {target}",
   "act.type": "在 {target} 中输入",
   "act.press": "按下了 {keys}",

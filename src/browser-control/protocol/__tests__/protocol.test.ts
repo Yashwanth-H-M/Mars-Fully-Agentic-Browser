@@ -4,6 +4,7 @@ import {
   ClickArgsSchema,
   DEFAULT_HINTS,
   DELIVERED_HINTS,
+  DragArgsSchema,
   ERROR_CODES,
   hintFor,
   isReadOnly,
@@ -32,6 +33,9 @@ describe('targets', () => {
 
   it('rejects unknown arguments', () => {
     expect(ClickArgsSchema.safeParse({ target: { ref: 'e1' }, force: true }).success).toBe(false);
+    expect(DragArgsSchema.safeParse({ from: { ref: 'e1' }, to: { ref: 'e2' } }).success).toBe(true);
+    expect(DragArgsSchema.safeParse({ target: { ref: 'e1' }, to: { ref: 'e2' } }).success).toBe(true);
+    expect(DragArgsSchema.safeParse({ from: { ref: 'e1' } }).success).toBe(false);
   });
 });
 

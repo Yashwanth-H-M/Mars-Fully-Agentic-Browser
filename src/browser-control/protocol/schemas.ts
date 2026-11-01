@@ -104,6 +104,24 @@ export const ClickArgsSchema = z.strictObject({
   modifiers: z.array(z.enum(['Alt', 'Control', 'Meta', 'Shift'])).optional(),
 });
 
+export const DragArgsSchema = z.preprocess(
+  arg => {
+    if (arg && typeof arg === 'object') {
+      const a = arg as Record<string, unknown>;
+      if (a.target !== undefined && a.from === undefined) {
+        const { target, ...rest } = a;
+        return { ...rest, from: target };
+      }
+    }
+    return arg;
+  },
+  z.strictObject({
+    ...actionCommon,
+    from: TargetSchema.describe('The element to drag'),
+    to: TargetSchema.describe('The element to drop onto'),
+  }),
+);
+
 export const SetArgsSchema = z.preprocess(
   arg => {
     if (arg && typeof arg === 'object') {
@@ -234,6 +252,7 @@ export type FindArgs = z.infer<typeof FindArgsSchema>;
 export type ReadArgs = z.infer<typeof ReadArgsSchema>;
 export type ScreenshotArgs = z.infer<typeof ScreenshotArgsSchema>;
 export type ClickArgs = z.infer<typeof ClickArgsSchema>;
+export type DragArgs = z.infer<typeof DragArgsSchema>;
 export type SetArgs = z.infer<typeof SetArgsSchema>;
 export type FillFormArgs = z.infer<typeof FillFormArgsSchema>;
 export type TypeArgs = z.infer<typeof TypeArgsSchema>;

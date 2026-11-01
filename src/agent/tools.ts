@@ -27,6 +27,7 @@ const GROUPS: Record<string, AgentTool['group']> = {
   screenshot: 'reading',
   wait: 'reading',
   click: 'acting',
+  drag: 'acting',
   set: 'acting',
   type: 'acting',
   press: 'acting',
