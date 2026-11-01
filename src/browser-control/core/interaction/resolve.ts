@@ -98,14 +98,28 @@ async function resolveSemantic(
         matches.push(n);
         return;
       }
-      const nodeNoEllipsis = cleanNodeName.replace(/\.{3}$|…$/, '').trim();
-      const queryNoEllipsis = targetQuery.replace(/\.{3}$|…$/, '').trim();
+      const nodeNoEllipsis = cleanNodeName.replace(/(?:\.{3}|…)+$/, '').trim();
+      const queryNoEllipsis = targetQuery.replace(/(?:\.{3}|…)+$/, '').trim();
       if (
         nodeNoEllipsis.length >= 6 &&
         (targetQuery.startsWith(nodeNoEllipsis) || cleanNodeName.startsWith(queryNoEllipsis))
       ) {
         matches.push(n);
         return;
+      }
+      if (
+        queryNoEllipsis.length >= 6 &&
+        (cleanNodeName.includes(queryNoEllipsis) || targetQuery.includes(nodeNoEllipsis))
+      ) {
+        matches.push(n);
+        return;
+      }
+      if (queryNoEllipsis.length > 25) {
+        const queryPrefix = queryNoEllipsis.slice(0, 30);
+        if (cleanNodeName.includes(queryPrefix)) {
+          matches.push(n);
+          return;
+        }
       }
       return;
     }
@@ -299,18 +313,28 @@ async function resolveByText(ctx: ToolContext, text: string, nth = 0): Promise<R
           const norm = s => clean(s).replace(/[\\u221A]/g, 'sqrt').replace(/\\\\sqrt/g, 'sqrt').replace(/[{}]/g, '').toLowerCase();
           const target = clean(rawTarget).toLowerCase();
           const normTarget = norm(rawTarget);
+          const stripEllipsis = s => (s || '').replace(/(?:\\.{3}|…)+$/, '').trim();
+          const targetCore = stripEllipsis(target);
+          const normTargetCore = stripEllipsis(normTarget);
+          const targetPrefix = targetCore.length > 25 ? targetCore.slice(0, 30) : '';
 
           const matchesTarget = (s) => {
             if (!s) return false;
             const c = clean(s).toLowerCase();
             const n = norm(s);
             if (c === target || n === normTarget) return true;
+            if (targetCore && (c === targetCore || n === normTargetCore)) return true;
             if (target.length <= 4) {
               // Word boundary for short queries to prevent matching inside long unrelated words/numbers
               const re = new RegExp('(^|\\\\s|[.,;:-])' + target.replace(/[.*+?^$\\{\\}()|[\\]\\\\]/g, '\\\\$&') + '($|\\\\s|[.,;:-])');
               return re.test(c);
             }
-            return c.includes(target) || n.includes(normTarget);
+            if (c.includes(target) || n.includes(normTarget)) return true;
+            if (targetCore.length >= 6 && (c.includes(targetCore) || n.includes(normTargetCore))) return true;
+            if (targetPrefix && (c.includes(targetPrefix) || n.includes(targetPrefix))) return true;
+            const sCore = stripEllipsis(c);
+            if (sCore.length >= 6 && target.includes(sCore)) return true;
+            return false;
           };
 
           // 1. Labels with matching text

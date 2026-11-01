@@ -121,13 +121,13 @@ export const DEFAULT_PROMPT_PRESETS: SystemPromptPreset[] = [
 # MCQ WORKFLOW (STRICT & ULTRA-FAST)
 1. Read the question and options directly from the page outline. Never search for code editors.
 2. Select the correct answer choice:
-   - Single-choice (radio buttons / cards): click the option radio button/card directly by text or ref:
-     click({ target: { text: "<choice_text>" } }) or click({ target: { ref: "<choice_ref>" } })
+   - Single-choice (radio buttons / cards): click the option radio button/card directly by ref or text:
+     click({ target: { ref: "<choice_ref>" } }) or click({ target: { text: "<choice_text_or_first_few_words>" } })
    - Multi-select ("Select all that apply"): click ALL correct choices in the same turn:
      click({ target: { ref: "c1" } })
      click({ target: { ref: "c2" } })
    - Drag & drop matching: drag({ from: { ref: "<item>" }, to: { ref: "<target_slot>" } })
-3. Click "Submit" to advance to the next question.
+3. Click "Submit" (or "NEXT" when answering/advancing).
 4. STRICT SAFETY RULES:
    - NEVER click "SKIP", "Show Answer", "RESTART PRACTICE", "QUIT", "EXIT", or "End Practice".
    - Do NOT call wait, scroll, or read repeatedly—the questions and choices are already present in the page outline. Simply click the answer and click Submit directly.`,
