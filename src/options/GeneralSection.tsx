@@ -114,25 +114,6 @@ export function GeneralSection() {
             }}
           />
         </SettingsRow>
-        <SettingsRow
-          label="Default Temperature"
-          description="Lower values (0.0 - 0.2) ensure deterministic tool calls and prevent chatter in local/OpenAI models.">
-          <Input
-            aria-label="Default Temperature"
-            type="number"
-            min={0}
-            max={2}
-            step={0.05}
-            className="w-24"
-            value={settings.defaultTemperature ?? 0.2}
-            onChange={e => {
-              const n = parseFloat(e.target.value);
-              if (Number.isFinite(n) && n >= 0 && n <= 2) {
-                void settingsStorage.set(s => ({ ...s, defaultTemperature: n }));
-              }
-            }}
-          />
-        </SettingsRow>
       </SettingsCard>
       <SettingsCard title={t('general.language')} className="flex flex-col gap-6">
         <UiLanguageRow />

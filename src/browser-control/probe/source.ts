@@ -171,6 +171,7 @@ export interface ProbeApi {
   selectedOptions(el: Element): SelectedOption[];
   selectContents(el: Element): boolean;
   isEditor?(el: Element): boolean;
+  editorValue?(el: Element): string | null;
   watchBlock(el: Element): string;
   blockMutations(): number;
   unwatchBlock?(): void;
@@ -261,6 +262,107 @@ export function probeMain(): void {
       el.closest('[class*="editor" i]') ||
       (el.matches(EDITOR_CONTAINER_SEL) ? el : null)
     );
+  };
+  /** Extracts full source code text from code editors (Monaco, Ace, CodeMirror, or virtualized lines) */
+  const getEditorValue = (el: Element | null): string | null => {
+    if (!el) return null;
+    const container = editorContainerOf(el) || el.closest(EDITOR_SEL) || el.querySelector(EDITOR_SEL);
+    if (!container) return null;
+
+    // 1. Ace Editor
+    const ace = (container as any).env?.editor || (el as any).env?.editor;
+    if (ace && typeof ace.getValue === 'function') {
+      try {
+        const val = ace.getValue();
+        if (typeof val === 'string' && val.length > 0) return val;
+      } catch {
+        // fallback
+      }
+    }
+
+    // 2. Monaco Editor
+    try {
+      const monaco = (window as any).monaco;
+      if (monaco?.editor) {
+        if (typeof monaco.editor.getEditors === 'function') {
+          const editors = monaco.editor.getEditors();
+          if (editors && editors.length > 0) {
+            for (const ed of editors) {
+              const dom = ed.getDomNode?.();
+              if (dom && (dom === container || container.contains(dom) || dom.contains(container))) {
+                const val = ed.getValue?.();
+                if (typeof val === 'string' && val.length > 0) return val;
+              }
+            }
+            const firstVal = editors[0].getValue?.();
+            if (typeof firstVal === 'string' && firstVal.length > 0) return firstVal;
+          }
+        }
+        if (typeof monaco.editor.getModels === 'function') {
+          const models = monaco.editor.getModels();
+          if (models && models.length > 0) {
+            const val = models[0].getValue?.();
+            if (typeof val === 'string' && val.length > 0) return val;
+          }
+        }
+      }
+    } catch {
+      // fallback
+    }
+
+    // 3. CodeMirror 5
+    const cm5 = (container as any).CodeMirror || (container.querySelector('.CodeMirror') as any)?.CodeMirror;
+    if (cm5 && typeof cm5.getValue === 'function') {
+      try {
+        const val = cm5.getValue();
+        if (typeof val === 'string' && val.length > 0) return val;
+      } catch {
+        // fallback
+      }
+    }
+
+    // 4. CodeMirror 6
+    try {
+      const cmView = (container as any).cmView || (container.querySelector('.cm-editor') as any)?.cmView;
+      if (cmView?.view?.state?.doc) {
+        const docStr = cmView.view.state.doc.toString();
+        if (typeof docStr === 'string' && docStr.length > 0) return docStr;
+      }
+    } catch {
+      // fallback
+    }
+
+    // 5. DOM line reconstruction (essential fallback for virtualized Monaco, CodeMirror, and Ace)
+    const viewLines = container.querySelector('.view-lines, [class*="view-lines" i]');
+    if (viewLines) {
+      const lineEls = [...viewLines.querySelectorAll('.view-line')];
+      if (lineEls.length > 0) {
+        const joined = lineEls.map(l => (l as HTMLElement).innerText || '').join('\n');
+        if (joined.trim().length > 0) return joined;
+      }
+      const text = (viewLines as HTMLElement).innerText;
+      if (text && text.trim().length > 0) return text;
+    }
+
+    const cmContent = container.querySelector('.cm-content');
+    if (cmContent) {
+      const text = (cmContent as HTMLElement).innerText;
+      if (text && text.trim().length > 0) return text;
+    }
+
+    const aceLayer = container.querySelector('.ace_text-layer');
+    if (aceLayer) {
+      const text = (aceLayer as HTMLElement).innerText;
+      if (text && text.trim().length > 0) return text;
+    }
+
+    const innerPre = container.querySelector('pre, code');
+    if (innerPre) {
+      const text = (innerPre as HTMLElement).innerText;
+      if (text && text.trim().length > 0) return text;
+    }
+
+    return null;
   };
   /**
    * A control of its own inside a target: native controls, links and the widget roles that activate. Content of an
@@ -460,8 +562,14 @@ export function probeMain(): void {
         checked = a === 'mixed' ? 'mixed' : a === 'true';
       }
       let value: string | null = null;
-      if (tag === 'input' || tag === 'textarea' || tag === 'select') value = (el as HTMLInputElement).value;
-      else if (contentEditable) value = (el as HTMLElement).innerText;
+      const editorVal = isEditor ? getEditorValue(el) : null;
+      if (editorVal !== null) {
+        value = editorVal;
+      } else if (tag === 'input' || tag === 'textarea' || tag === 'select') {
+        value = (el as HTMLInputElement).value;
+      } else if (contentEditable) {
+        value = (el as HTMLElement).innerText;
+      }
       // visibility: hidden counts as not visible; opacity 0 does not (Playwright's rule).
       const visible =
         typeof (el as any).checkVisibility === 'function'
@@ -841,10 +949,33 @@ export function probeMain(): void {
       return Boolean(editorContainerOf(el) || el.closest(EDITOR_SEL) || el.querySelector(EDITOR_SEL));
     },
 
+    editorValue(el: Element) {
+      return getEditorValue(el);
+    },
+
     /** Selects the whole content of a focused field or editor, so the next insertion replaces it. */
     selectContents(el: Element) {
       const container = editorContainerOf(el) || el.closest(EDITOR_SEL) || el.querySelector(EDITOR_SEL);
       if (container) {
+        const monaco = (window as any).monaco;
+        if (monaco?.editor) {
+          try {
+            const editors = monaco.editor.getEditors?.() ?? [];
+            for (const ed of editors) {
+              const dom = ed.getDomNode?.();
+              if (dom && (dom === container || container.contains(dom) || dom.contains(container))) {
+                ed.focus?.();
+                const model = ed.getModel?.();
+                if (model) {
+                  ed.setSelection?.(model.getFullModelRange?.());
+                  return true;
+                }
+              }
+            }
+          } catch {
+            // fallback
+          }
+        }
         const ace = (container as any).env?.editor || (el as any).env?.editor;
         if (ace && typeof ace.selectAll === 'function') {
           try {

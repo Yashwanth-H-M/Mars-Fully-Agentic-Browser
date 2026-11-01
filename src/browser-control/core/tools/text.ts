@@ -73,6 +73,20 @@ function readBack(wanted: string, got: string | null, masked: boolean): ActionRe
   if (got === null) return { status: 'not_checked', detail: 'the value could not be read back' };
   if (masked) return { status: got === wanted ? 'met' : 'unmet', detail: 'value is masked' };
   if (got === wanted) return { status: 'met', detail: `read back ${quote(got)}` };
+  const normGot = got
+    .replace(/\r\n/g, '\n')
+    .replace(/[ \t]+$/gm, '')
+    .trim();
+  const normWanted = wanted
+    .replace(/\r\n/g, '\n')
+    .replace(/[ \t]+$/gm, '')
+    .trim();
+  if (
+    normGot === normWanted ||
+    (normWanted.length > 30 && (normGot.includes(normWanted) || normWanted.includes(normGot)))
+  ) {
+    return { status: 'met', detail: `read back ${quote(got)}` };
+  }
   return { status: 'unmet', detail: `read back ${quote(got ?? '')}, requested ${quote(wanted)}` };
 }
 

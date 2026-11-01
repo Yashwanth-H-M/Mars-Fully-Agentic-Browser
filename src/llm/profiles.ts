@@ -144,35 +144,6 @@ export function makePair<M>(
   model: M,
   setting: ReasoningEffort,
   capability: ReasoningSupport | undefined,
-): { model: M; reasoning: ReasoningEffort; temperature?: number } {
+): { model: M; reasoning: ReasoningEffort } {
   return { model, reasoning: capability === 'optional' || capability === 'always' ? setting : 'none' };
-}
-
-/**
- * Whether a model supports temperature. OpenAI reasoning models (o1, o3) reject custom temperature.
- * Anthropic rejects non-1.0 temperature when extended thinking is enabled.
- * All local models (Ollama, LM Studio) and OpenAI-compatible models fully support temperature.
- */
-export function supportsTemperature(
-  profile: ModelProfile,
-  effort?: ReasoningEffort,
-  kind?: ProviderKind,
-  modelName?: string,
-): boolean {
-  if (kind === 'openai' && profile.reasoning === 'always') return false;
-  if (kind === 'openai' && modelName && /^(?:o1|o3|o4)/i.test(modelName)) return false;
-  if (kind === 'anthropic' && effort && effort !== 'none') return false;
-  return true;
-}
-
-export function sanitizeTemperature(
-  temp: number | undefined,
-  profile: ModelProfile,
-  effort?: ReasoningEffort,
-  kind?: ProviderKind,
-  modelName?: string,
-): number | undefined {
-  if (temp === undefined) return undefined;
-  if (!supportsTemperature(profile, effort, kind, modelName)) return undefined;
-  return Math.max(0, Math.min(2, temp));
 }

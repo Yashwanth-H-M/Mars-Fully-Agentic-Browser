@@ -19,7 +19,6 @@ export interface ModelRef {
 export interface LivePair {
   model: ModelRef;
   reasoning: ReasoningEffort;
-  temperature?: number;
 }
 
 export interface Usage {
@@ -103,7 +102,6 @@ export interface MessageMeta {
   model?: ModelRef;
   /** What the SDK's reasoning option was given for the request, after the row's map; absent when nothing was sent. */
   reasoning?: WireEffort;
-  temperature?: number;
   usage?: Usage;
   durationMs?: number;
   stopReason?: string;

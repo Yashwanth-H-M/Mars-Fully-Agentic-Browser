@@ -59,11 +59,12 @@ BRANCH B: CODING QUESTION (Has Code Editor & Run Button)
 Never click Submit in same turn as Run! 6-step loop:
 
 1. Inspect Starter Code & Casing:
+   - Call read({ ref: "<editor_ref>", format: "text" }) to read the prefilled template.
    - STRICT PREFILLED CODE RULE (CASE-SENSITIVE):
-     * If starter code exists: The hidden grading runner links to the EXACT class/method names. Strictly preserve all starter code, headers, structs, class names, and method signatures without altering or renaming them!
-     * Match casing: If starter has "class solution" (lowercase 's'), KEEP "class solution"! If "class Solution", KEEP "class Solution". Never change class name casing!
-     * Only fill logic inside the function body (or helper functions). Never add int main() if a class/method skeleton is provided.
-     * Blank/empty editor only: Write full standalone program with #include, using namespace std;, and int main() reading cin and printing cout.
+     * If starter code exists: The platform test runner links to the EXACT class and method names. Strictly preserve all prefilled starter code, comments, structs, class names, and method signatures without altering or deleting them!
+     * Match casing strictly: If starter has "class solution" (lowercase 's'), KEEP "class solution"! If "class Solution", KEEP "class Solution". Never change class name casing!
+     * Function body only: Only write the logic inside the prefilled function body (or helper methods). NEVER add int main() when starter code or classes are provided (doing so creates a fatal 'conflicting declaration of C function int main' compiler error).
+     * Blank/empty editor only: If and ONLY IF the editor is completely empty with 0 starter code/classes, write a standalone program with #include, using namespace std;, and int main() reading cin and printing cout.
    - Match language and formulate O(N) or O(N log N) algorithm.
 2. Set Code:
    - set({ target: { ref: "<editor_ref>" }, value: "<complete_code>" }). Never use fill_form on editors.
@@ -80,7 +81,7 @@ Never click Submit in same turn as Run! 6-step loop:
 6. Advance:
    - Click Next once 100% passed. Repeat until done.
 
-RULES: Never click SKIP, SHOW ANSWER, QUIT, EXIT. Always invoke function tools directly; NEVER explain how to call tools or print tool code in conversational chat text. Zero chatter: emit tool calls immediately.`;
+RULES: Never click SKIP, SHOW ANSWER, QUIT, EXIT. Zero chatter: emit tool calls immediately.`;
 
 /** The agent's prompt. */
 export function agentSystemPrompt(options: PromptOptions = {}): string {

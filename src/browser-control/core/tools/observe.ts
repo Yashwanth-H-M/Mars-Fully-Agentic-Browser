@@ -18,6 +18,8 @@ import { compactOps, diffLines, renderDiff } from '../perception/diff';
 import type { FrameRecord } from '../ports';
 import { rememberSecret } from '../redact';
 import { quote } from '../text';
+import { resolveTarget } from '../interaction/resolve';
+import type { ProbeState } from '../../probe';
 
 /** A capture is reused by read-only helpers only right after it, with no action in between. */
 const REUSE_MS = 2_000;
@@ -202,13 +204,28 @@ export async function read(
   const tab = ctx.tab();
   const observation = await recentObservation(ctx);
   let roots = observation.tree;
+  let customContent: string | null = null;
   if (args.ref) {
     const record = lookupRef(ctx.controller.registry, ctx.session.known, args.ref, tab.tabId);
     const node = findNode(roots, record.frameId, record.backendNodeId);
     if (!node) throw new LayerError('NODE_DETACHED', `Ref ${args.ref} is no longer in the page`);
     roots = [node];
+    try {
+      const target = await resolveTarget(ctx, { ref: args.ref }).catch(() => null);
+      if (target && tab.probe) {
+        const state = await tab.probe.call<ProbeState>(target.frame, target.objectId, 'state').catch(() => null);
+        if (state?.value && state.value.trim().length > 0) {
+          const isEditor = await tab.probe.call<boolean>(target.frame, target.objectId, 'isEditor').catch(() => false);
+          if (isEditor || state.value.length > 30 || state.value.includes('\n')) {
+            customContent = state.value;
+          }
+        }
+      }
+    } catch {
+      // fallback to renderContent
+    }
   }
-  const content = renderContent(roots, args.format ?? 'markdown');
+  const content = customContent ?? renderContent(roots, args.format ?? 'markdown');
   const offset = args.offset ?? 0;
   const { text, remaining } = sliceContent(content, offset, args.maxChars ?? 20_000);
   const notices = remaining ? [`… ${remaining} more characters; continue with offset ${offset + text.length}.`] : [];

@@ -16,7 +16,7 @@ import { note, RunWriter, storedResult } from './records';
 import { clearsDebt, createsDebt, debtLabel, refusal, unverifiedLines } from './completion';
 import type { DebtEntry } from './completion';
 import { Guards } from './guards';
-import { contextThreshold, hardLimit, planElision } from './elision';
+import { contextThreshold, elisionChunk, hardLimit, planElision } from './elision';
 import { runCompaction, runShorten } from './compaction';
 import { attachmentBytes, attachmentParts, readAttachment } from './attachments';
 import { learnFrom, turnEffort } from './run';
@@ -233,11 +233,10 @@ export class AgentLoop {
     const threshold = this.#turns < this.#cooldownUntil ? limit : contextThreshold(profile, window);
     let tokens = this.estimate(request);
     let rebuilt: Request | undefined;
-    // Step 1: older page content in tool results and attached to user messages is replaced by a stub only when approaching threshold
-    // to preserve prompt prefix caching and local LLM KV cache for normal turns.
-    if (tokens > threshold) {
+    if (tokens > threshold / 2) {
       const plan = planElision(await activeBranch(this.options.conversationId));
-      if (plan.length) {
+      const saved = plan.reduce((n, e) => n + e.saved, 0) / 4;
+      if (plan.length && (tokens > threshold || saved >= elisionChunk(window))) {
         for (const e of plan) {
           await appendEntry(this.options.conversationId, {
             type: 'context_edit',
@@ -931,7 +930,6 @@ export class AgentLoop {
       messages,
       tools: Object.fromEntries(tools.map(t => [t.name, { description: t.description, parameters: t.parameters }])),
       maxOutputTokens: requestOutputLimit(model.profile),
-      temperature: model.temperature,
       reasoning,
       noneRetry,
       signal,

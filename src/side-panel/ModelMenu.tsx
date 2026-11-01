@@ -39,21 +39,17 @@ export function ModelMenu({
   models,
   model,
   reasoning,
-  temperature,
   running,
   onModel,
   onReasoning,
-  onTemperature,
 }: {
   models: ModelChoice[];
   model: ModelRef | null;
   reasoning: ReasoningEffort;
-  temperature?: number;
   /** A run is active: a change applies when the next run starts. */
   running: boolean;
   onModel: (model: ModelRef) => void;
   onReasoning: (reasoning: ReasoningEffort) => void;
-  onTemperature?: (temperature: number) => void;
 }) {
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
@@ -160,51 +156,8 @@ export function ModelMenu({
             ))}
           </div>
           {row ? <EffortRow row={row} value={reasoning} onReasoning={onReasoning} running={running} /> : null}
-          {onTemperature ? (
-            <TemperatureRow value={temperature ?? 0.2} onTemperature={onTemperature} running={running} />
-          ) : null}
         </div>
       ) : null}
-    </div>
-  );
-}
-
-function TemperatureRow({
-  value,
-  onTemperature,
-  running,
-}: {
-  value: number;
-  onTemperature: (temp: number) => void;
-  running: boolean;
-}) {
-  const presets = [
-    { label: '0.0', desc: 'Deterministic', val: 0.0 },
-    { label: '0.2', desc: 'Default', val: 0.2 },
-    { label: '0.7', desc: 'Creative', val: 0.7 },
-  ];
-  return (
-    <div className="mt-1 flex flex-col gap-1.5 border-t border-nb-border px-3 py-2">
-      <div className="flex items-center justify-between text-xs text-nb-muted">
-        <span>Temperature</span>
-        <span className="font-mono text-nb-fg">{value.toFixed(1)}</span>
-      </div>
-      <div className="flex gap-1">
-        {presets.map(p => (
-          <button
-            key={p.label}
-            type="button"
-            className={`flex-1 whitespace-nowrap rounded border px-2 py-1 text-xs transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-nb-accent/40 ${
-              Math.abs(value - p.val) < 0.05
-                ? 'border-nb-accent bg-nb-accent/15 font-medium text-nb-fg'
-                : 'border-nb-border text-nb-muted hover:text-nb-fg'
-            }`}
-            onClick={() => onTemperature(p.val)}>
-            {p.label}
-          </button>
-        ))}
-      </div>
-      {running ? <span className="text-[10px] text-nb-muted">Applies on next run</span> : null}
     </div>
   );
 }

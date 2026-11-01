@@ -159,8 +159,6 @@ export function Composer({
   models,
   reasoning = 'none',
   onReasoning,
-  temperature,
-  onTemperature,
   history,
   draft,
   onDraftUsed,
@@ -190,8 +188,6 @@ export function Composer({
   /** The conversation's reasoning effort, shown in the model picker. */
   reasoning?: ReasoningEffort;
   onReasoning?: (reasoning: ReasoningEffort) => void;
-  temperature?: number;
-  onTemperature?: (temperature: number) => void;
   /** The user's earlier prompts, oldest first, for ↑. */
   history: string[];
   /** Text to put back into the input (queued messages returned on Stop). */
@@ -606,11 +602,9 @@ export function Composer({
             models={models}
             model={model}
             reasoning={reasoning}
-            temperature={temperature}
             running={active}
             onModel={onModel}
             onReasoning={next => onReasoning?.(next)}
-            onTemperature={next => onTemperature?.(next)}
           />
           <span className="flex-1" />
           {transcribe !== undefined ? (
