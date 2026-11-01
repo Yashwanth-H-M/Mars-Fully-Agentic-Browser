@@ -91,14 +91,12 @@ function resolveSystemPrompt(settings: typeof DEFAULT_SETTINGS, tools: ReturnTyp
       ? activePreset.prompt.trim()
       : undefined;
 
-  return (
-    promptOverride ??
-    agentSystemPrompt({
-      responseLanguage: settings.responseLanguage,
-      tools: tools.map(t => t.name),
-      customInstructions: settings.customInstructions,
-    })
-  );
+  return agentSystemPrompt({
+    promptOverride,
+    responseLanguage: settings.responseLanguage,
+    tools: tools.map(t => t.name),
+    customInstructions: settings.customInstructions,
+  });
 }
 
 export class RunManager {

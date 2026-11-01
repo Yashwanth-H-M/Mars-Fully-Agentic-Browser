@@ -8,6 +8,8 @@ export interface PromptOptions {
   tools?: string[];
   /** The user's custom instructions; at most CUSTOM_INSTRUCTIONS_MAX characters are sent. */
   customInstructions?: string;
+  /** Custom persona / role prompt override. */
+  promptOverride?: string;
 }
 
 /** The contract for untrusted content. */
@@ -81,7 +83,7 @@ Output tool calls immediately without preamble. Never write commentary or explan
 
 /** The agent's prompt. */
 export function agentSystemPrompt(options: PromptOptions = {}): string {
-  const sections = [ROLE, CONTRACT];
+  const sections = [options.promptOverride?.trim() || ROLE, CONTRACT];
   const custom = options.customInstructions?.trim().slice(0, CUSTOM_INSTRUCTIONS_MAX).trim();
   if (custom) {
     // The user's own words, from Settings → Memory; no tool writes them.
