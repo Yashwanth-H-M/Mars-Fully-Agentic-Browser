@@ -580,7 +580,11 @@ export class RunManager {
         await settingsStorage.set(s => ({ ...s, defaultMode: command.mode }));
         return;
       case 'set-model':
-        await this.#setModel(command.conversationId, { model: command.model, reasoning: command.reasoning });
+        await this.#setModel(command.conversationId, {
+          model: command.model,
+          reasoning: command.reasoning,
+          temperature: command.temperature,
+        });
         return;
       case 'history':
         return this.#history(connection, command.query);
@@ -1196,7 +1200,12 @@ export class RunManager {
   async #setModel(conversationId: string, pair: LivePair): Promise<void> {
     if (!(await getConversation(conversationId))) return;
     await this.#writeLive(conversationId, pair);
-    await settingsStorage.set(s => ({ ...s, defaultModel: pair.model, reasoning: pair.reasoning }));
+    await settingsStorage.set(s => ({
+      ...s,
+      defaultModel: pair.model,
+      reasoning: pair.reasoning,
+      ...(pair.temperature !== undefined ? { defaultTemperature: pair.temperature } : {}),
+    }));
   }
 
   /** Writes a live pair to `storage.session` and tells the conversation's panels. */
@@ -1204,6 +1213,7 @@ export class RunManager {
     const pairOf = (p: LivePair): LivePair => ({
       model: { providerId: p.model.providerId, model: p.model.model },
       reasoning: p.reasoning,
+      ...(p.temperature !== undefined ? { temperature: p.temperature } : {}),
     });
     const next = pairOf(pair);
     const stored = await getLive(conversationId);

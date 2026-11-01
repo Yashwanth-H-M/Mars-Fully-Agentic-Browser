@@ -53,6 +53,8 @@ export interface TurnResult {
    * caller stops sending the option for the rest of its run.
    */
   reasoningDropped?: boolean;
+  /** The server refused the temperature option with a 400 that names it, and the request was sent again without it. */
+  temperatureDropped?: boolean;
   /** The server refused None's value and took Low's (`noneRetry`) instead: the model refuses None. */
   noneRefused?: boolean;
   /** The server refused the images, and the request was sent again with each replaced by a note. */
@@ -77,6 +79,8 @@ export interface TurnRequest {
   /** Only these tools may be called, e.g. `done` alone for the salvage call. */
   toolChoice?: 'auto' | 'none' | 'required';
   maxOutputTokens?: number;
+  /** The sampling temperature (0.0 to 2.0). Lower is more deterministic. */
+  temperature?: number;
   /** The SDK's reasoning option, from the send rule; left out when undefined. */
   reasoning?: WireEffort;
   /** When `reasoning` is None's value: Low's, to try once if the server refuses None. */
@@ -433,6 +437,11 @@ export function refusesReasoning(status: number | undefined, message: string): b
   return status === 400 && /reasoning|thinking|effort/i.test(message);
 }
 
+/** A 400 that names the temperature option: the server or model does not support it (e.g. o1/o3). */
+export function refusesTemperature(status: number | undefined, message: string): boolean {
+  return status === 400 && /temperature/i.test(message);
+}
+
 /** A 400 that names an image: the model does not take images. */
 export function refusesImages(status: number | undefined, message: string): boolean {
   return status === 400 && /image|vision|multimodal/i.test(message);
@@ -485,6 +494,8 @@ async function streamTurnNow(request: TurnRequest): Promise<TurnResult> {
   let messages = request.messages;
   let imagesDropped = false;
   let reasoningIgnored = false;
+  let temperature = request.temperature;
+  let temperatureDropped = false;
   for (;;) {
     attempt++;
     let text = '';
@@ -502,6 +513,7 @@ async function streamTurnNow(request: TurnRequest): Promise<TurnResult> {
         tools,
         toolChoice: tools ? (request.toolChoice ?? 'auto') : undefined,
         maxOutputTokens: request.maxOutputTokens ?? request.chat.spec.maxOutputTokens,
+        ...(temperature !== undefined ? { temperature } : {}),
         ...(reasoning ? { reasoning } : {}),
         maxRetries: 0,
         abortSignal: request.signal,
@@ -566,7 +578,7 @@ async function streamTurnNow(request: TurnRequest): Promise<TurnResult> {
           const extracted = extractToolCallsFromText(text, request.tools);
           if (extracted.length > 0) {
             toolCalls.push(...extracted);
-            text = '';
+            text = text.replace(/<tool_call>[\s\S]*?<\/tool_call>/gi, '').trim();
             finish = 'tool-calls';
           }
         }
@@ -574,7 +586,7 @@ async function streamTurnNow(request: TurnRequest): Promise<TurnResult> {
           const fromReasoning = extractToolCallsFromText(reasoningText, request.tools);
           if (fromReasoning.length > 0) {
             toolCalls.push(...fromReasoning);
-            text = '';
+            text = text.replace(/<tool_call>[\s\S]*?<\/tool_call>/gi, '').trim();
             finish = 'tool-calls';
           } else if (!text.trim()) {
             text = reasoningText.replace(/<\/?think>/gi, '').trim();
@@ -591,6 +603,7 @@ async function streamTurnNow(request: TurnRequest): Promise<TurnResult> {
         durationMs: Date.now() - start,
         attempts: attempt,
         ...(reasoningDropped ? { reasoningDropped } : {}),
+        ...(temperatureDropped ? { temperatureDropped } : {}),
         ...(noneRefused && !reasoningDropped ? { noneRefused } : {}),
         ...(imagesDropped ? { imagesDropped } : {}),
         ...(reasoningIgnored ? { reasoningIgnored } : {}),
@@ -600,6 +613,12 @@ async function streamTurnNow(request: TurnRequest): Promise<TurnResult> {
     // when a value was refused, or without its images when they were.
     const status = getApiCallStatusCode(failure);
     const fallback = !started && request.fallback !== false;
+    if (fallback && temperature !== undefined && refusesTemperature(status, errorText(failure))) {
+      temperature = undefined;
+      temperatureDropped = true;
+      attempt--;
+      continue;
+    }
     if (fallback && reasoning !== undefined && refusesReasoning(status, errorText(failure))) {
       if (noneRetry !== undefined) {
         reasoning = noneRetry;
@@ -642,6 +661,7 @@ async function streamTurnNow(request: TurnRequest): Promise<TurnResult> {
       durationMs: Date.now() - start,
       attempts: attempt,
       ...(reasoningDropped ? { reasoningDropped } : {}),
+      ...(temperatureDropped ? { temperatureDropped } : {}),
       ...(imagesDropped ? { imagesDropped } : {}),
     };
   }

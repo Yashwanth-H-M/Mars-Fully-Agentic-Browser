@@ -15,6 +15,8 @@ export interface Settings {
   defaultModel: ModelRef | null;
   /** The effort for new conversations on a model that reasons; the latest choice in a picker. */
   reasoning: ReasoningEffort;
+  /** Default temperature for LLM generation (0.0 to 1.0). 0.2 default for deterministic precision. */
+  defaultTemperature: number;
   turnCap: number;
   /** Custom instructions; at most CUSTOM_INSTRUCTIONS_MAX characters reach the prompt. */
   customInstructions: string;
@@ -87,6 +89,7 @@ export const DEFAULT_SETTINGS: Settings = {
   defaultMode: 'auto',
   defaultModel: null,
   reasoning: 'none',
+  defaultTemperature: 0.2,
   turnCap: 100,
   customInstructions: '',
   theme: 'system',

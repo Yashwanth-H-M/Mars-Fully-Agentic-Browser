@@ -60,7 +60,7 @@ export type PanelCommand =
   | { type: 'retry'; conversationId: string }
   | { type: 'set-mode'; conversationId: string; mode: PermissionMode }
   /** Writes the conversation's live pair, and the settings: the latest choice is the default. */
-  | { type: 'set-model'; conversationId: string; model: ModelRef; reasoning: ReasoningEffort }
+  | { type: 'set-model'; conversationId: string; model: ModelRef; reasoning: ReasoningEffort; temperature?: number }
   | { type: 'history'; query?: string }
   /**
    * Recent tasks shows a conversation in this tab's panel without binding the tab to it. The tab moves to it only when

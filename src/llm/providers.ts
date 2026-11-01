@@ -16,6 +16,7 @@ export interface ModelSpec {
   apiKey?: string;
   baseUrl?: string;
   maxOutputTokens?: number;
+  contextWindow?: number;
   /** For a local server: at most this many requests at once to it. */
   maxConcurrent?: number;
 }
@@ -33,6 +34,8 @@ export interface ChatModel {
 export interface CreateModelOptions {
   /** Custom fetch, used by tests to inspect requests. */
   fetch?: typeof fetch;
+  /** Conversation ID for prompt caching affinity routing. */
+  conversationId?: string;
 }
 
 export const DEFAULT_BASE_URLS: Partial<Record<ProviderKind, string>> = {
@@ -97,7 +100,13 @@ export function createModel(spec: ModelSpec, options: CreateModelOptions = {}): 
       return {
         spec,
         model: openai.responses(modelName),
-        providerOptions: { openai: { strictJsonSchema: false, store: false } },
+        providerOptions: {
+          openai: {
+            strictJsonSchema: false,
+            store: false,
+            ...(options.conversationId ? { promptCacheKey: options.conversationId } : {}),
+          },
+        },
       };
     }
     default: {
@@ -114,8 +123,9 @@ export function createModel(spec: ModelSpec, options: CreateModelOptions = {}): 
                 string,
                 unknown
               >;
-              if (!options.num_ctx) options.num_ctx = 32768;
+              if (!options.num_ctx) options.num_ctx = spec.contextWindow ?? 16384;
               body.options = options;
+              if (!('keep_alive' in body)) body.keep_alive = '30m';
               init = { ...init, body: JSON.stringify(body) };
             } catch {
               // ignore
@@ -140,7 +150,12 @@ export function createModel(spec: ModelSpec, options: CreateModelOptions = {}): 
       return {
         spec,
         model: openai.chat(modelName),
-        providerOptions: { openai: { strictJsonSchema: false } },
+        providerOptions: {
+          openai: {
+            strictJsonSchema: false,
+            ...(options.conversationId ? { promptCacheKey: options.conversationId } : {}),
+          },
+        },
         ...(accounting ? { takeCost: accounting.takeCost } : {}),
       };
     }

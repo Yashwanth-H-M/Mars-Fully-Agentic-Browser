@@ -303,6 +303,7 @@ export function App() {
   }, [state.conversationId, draftPair, made, settingsRead, providersRead]);
   const model = pickModel(models, pair?.model, settings.defaultModel);
   const reasoning: ReasoningEffort = pair?.reasoning ?? 'none';
+  const temperature: number = pair?.temperature ?? settings.defaultTemperature ?? 0.2;
   /** A model or effort chosen in the picker: the conversation's, or the draft's; the latest is the default too. */
   const choose = (next: LivePair) => {
     if (state.conversationId) {
@@ -310,7 +311,12 @@ export function App() {
       return;
     }
     setDraftPair(next);
-    void settingsStorage.set(s => ({ ...s, defaultModel: next.model, reasoning: next.reasoning }));
+    void settingsStorage.set(s => ({
+      ...s,
+      defaultModel: next.model,
+      reasoning: next.reasoning,
+      ...(next.temperature !== undefined ? { defaultTemperature: next.temperature } : {}),
+    }));
   };
   const active = isActive(state.status);
   const ratingCard = useRatingCard(state.conversationId, state.startedAt, active, !!whatsNew);
@@ -720,8 +726,10 @@ export function App() {
         onStop={() => state.conversationId && client?.send({ type: 'stop', conversationId: state.conversationId })}
         onMode={changeMode}
         reasoning={reasoning}
-        onModel={next => choose({ model: next, reasoning })}
-        onReasoning={next => model && choose({ model, reasoning: next })}
+        temperature={temperature}
+        onModel={next => choose({ model: next, reasoning, temperature })}
+        onReasoning={next => model && choose({ model, reasoning: next, temperature })}
+        onTemperature={next => model && choose({ model, reasoning, temperature: next })}
       />
     </div>
   );

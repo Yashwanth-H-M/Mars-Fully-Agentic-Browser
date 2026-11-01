@@ -1,6 +1,7 @@
 // Resolves a conversation's live model and effort to a callable model and its profile, from the stored providers and
 // keys. The key leaves storage only to build the provider client.
 import { createModel, detectContext, makePair, resolveProfile } from '@src/llm';
+import { sanitizeTemperature } from '@src/llm/profiles';
 import {
   capabilityOf,
   findModel,
@@ -31,7 +32,13 @@ export async function livePair(conversationId: string | null): Promise<LivePair 
   ]);
   const model = usableModel(providers, stored?.model, settings.defaultModel);
   if (!model) return null;
-  if (stored) return { model, reasoning: stored.reasoning };
+  if (stored) {
+    return {
+      model,
+      reasoning: stored.reasoning,
+      ...(stored.temperature !== undefined ? { temperature: stored.temperature } : {}),
+    };
+  }
   return makePair(model, settings.reasoning, capabilityOf(providers, model));
 }
 
@@ -81,10 +88,19 @@ export async function resolveModel(pair: LivePair | null): Promise<ResolvedModel
     apiKey: keys[found.provider.id],
     baseUrl: found.provider.baseUrl,
     maxOutputTokens: profile.maxOutput,
+    contextWindow: profile.contextWindow,
     // Ollama and LM Studio take one request at a time by default; more wait in the extension, not on the server.
     ...(LOCAL_KINDS.has(found.provider.kind) ? { maxConcurrent: 1 } : {}),
   });
   const learn = (facts: Parameters<NonNullable<ResolvedModel['learn']>>[0]) =>
     void learnFacts(found.provider.id, found.provider.baseUrl, found.model.name, facts);
-  return { ref, chat, profile, reasoning: pair.reasoning, learn };
+  const settings = await settingsStorage.get();
+  const temperature = sanitizeTemperature(
+    pair.temperature ?? settings.defaultTemperature,
+    profile,
+    pair.reasoning,
+    found.provider.kind,
+    found.model.name,
+  );
+  return { ref, chat, profile, reasoning: pair.reasoning, temperature, learn };
 }

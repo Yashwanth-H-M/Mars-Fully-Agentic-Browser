@@ -16,6 +16,8 @@ export interface ResolvedModel {
   profile: ModelProfile;
   /** The conversation's effort for this run. */
   reasoning: ReasoningEffort;
+  /** The sampling temperature for generation (0.0 to 2.0). */
+  temperature?: number;
   /**
    * The server refused the reasoning option: nothing is sent for the rest
    * of the run, by every call that reads this handle. Never stored.
@@ -90,6 +92,7 @@ export async function runChat(options: RunOptions): Promise<RunEnd> {
     system: options.system,
     messages,
     maxOutputTokens: requestOutputLimit(model.profile),
+    temperature: model.temperature,
     signal,
     onTextDelta: delta => {
       text += delta;

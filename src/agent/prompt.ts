@@ -80,7 +80,7 @@ Never click Submit in same turn as Run! 6-step loop:
 6. Advance:
    - Click Next once 100% passed. Repeat until done.
 
-RULES: Never click SKIP, SHOW ANSWER, QUIT, EXIT. Zero chatter: emit tool calls immediately.`;
+RULES: Never click SKIP, SHOW ANSWER, QUIT, EXIT. Always invoke function tools directly; NEVER explain how to call tools or print tool code in conversational chat text. Zero chatter: emit tool calls immediately.`;
 
 /** The agent's prompt. */
 export function agentSystemPrompt(options: PromptOptions = {}): string {
