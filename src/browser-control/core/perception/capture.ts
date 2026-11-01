@@ -1,6 +1,7 @@
 // Perception tier 1 capture: Accessibility.getFullAXTree per frame, on the frame's session.
 // Observation is read-only: nothing here changes the page.
 import type { CdpPort, FrameRecord, SessionId, TopologyPort } from '../ports';
+import { isLayerError } from '../../protocol/errors';
 import type { AXNode } from './ax';
 import { LAYOUT_STYLES } from './layout';
 import type { RawSnapshot } from './layout';
@@ -75,8 +76,15 @@ export interface Capture {
 export async function enableDomains(cdp: CdpPort, sessionId: SessionId, enabled: Set<string>): Promise<void> {
   const key = sessionId ?? '';
   if (enabled.has(key)) return;
-  await Promise.all([cdp.send(sessionId, 'DOM.enable'), cdp.send(sessionId, 'Accessibility.enable')]);
-  enabled.add(key);
+  try {
+    await Promise.all([cdp.send(sessionId, 'DOM.enable'), cdp.send(sessionId, 'Accessibility.enable')]);
+    enabled.add(key);
+  } catch (error) {
+    if (sessionId && (/session.*not found/i.test(String(error)) || (isLayerError(error) && error.code === 'FRAME_DETACHED'))) {
+      return;
+    }
+    throw error;
+  }
 }
 
 async function fieldFacts(_cdp: CdpPort, _sessionId: SessionId, _nodes: AXNode[]): Promise<Record<string, FieldFacts>> {
@@ -190,16 +198,24 @@ async function captureLayout(
   try {
     const entries = await Promise.all(
       sessions.map(async sessionId => {
-        const snapshot = await cdp.send<RawSnapshot>(
-          sessionId,
-          'DOMSnapshot.captureSnapshot',
-          { computedStyles: [...LAYOUT_STYLES], includeDOMRects: true, includePaintOrder: false },
-          CAPTURE_COMMAND_TIMEOUT_MS,
-        );
-        return [sessionId ?? '', snapshot] as const;
+        try {
+          const snapshot = await cdp.send<RawSnapshot>(
+            sessionId,
+            'DOMSnapshot.captureSnapshot',
+            { computedStyles: [...LAYOUT_STYLES], includeDOMRects: true, includePaintOrder: false },
+            CAPTURE_COMMAND_TIMEOUT_MS,
+          );
+          return [sessionId ?? '', snapshot] as const;
+        } catch (error) {
+          if (sessionId && (/session.*not found/i.test(String(error)) || (isLayerError(error) && error.code === 'FRAME_DETACHED'))) {
+            return [sessionId ?? '', null] as const;
+          }
+          throw error;
+        }
       }),
     );
-    return { layout: Object.fromEntries(entries) };
+    const validEntries = entries.filter((entry): entry is readonly [string, RawSnapshot] => entry[1] !== null);
+    return { layout: Object.fromEntries(validEntries) };
   } catch (error) {
     return { error: error instanceof Error ? error.message : String(error) };
   }
@@ -213,7 +229,18 @@ export async function captureTier1(
 ): Promise<Capture> {
   const start = performance.now();
   const frames = await topology.frames();
-  await Promise.all([...new Set(frames.map(f => f.sessionId))].map(s => enableDomains(cdp, s, state.enabledSessions)));
+  await Promise.all(
+    [...new Set(frames.map(f => f.sessionId))].map(async s => {
+      try {
+        await enableDomains(cdp, s, state.enabledSessions);
+      } catch (error) {
+        if (s && (/session.*not found/i.test(String(error)) || (isLayerError(error) && error.code === 'FRAME_DETACHED'))) {
+          return;
+        }
+        throw error;
+      }
+    }),
+  );
   const planned = await planFrames(cdp, frames);
   const layoutPromise = captureLayout(cdp, planned, state);
   await Promise.all(
