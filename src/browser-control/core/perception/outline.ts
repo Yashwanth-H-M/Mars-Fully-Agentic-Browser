@@ -209,13 +209,7 @@ export function isForfeitAction(name: string): boolean {
     norm === 'reset practice' ||
     norm === 'quit practice' ||
     norm === 'exit practice' ||
-    norm === 'end test' ||
-    norm === 'quit test' ||
-    norm === 'exit test' ||
-    norm === 'end assessment' ||
-    norm === 'quit assessment' ||
     norm === 'leave practice' ||
-    norm === 'leave test' ||
     norm === 'practice instructions' ||
     norm.includes('end practice') ||
     norm.includes('restart practice') ||

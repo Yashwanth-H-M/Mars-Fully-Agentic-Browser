@@ -4,7 +4,8 @@ import { RefRegistry } from '../refs';
 import type { Capture } from '../perception/capture';
 import { buildObservation } from '../perception/observe';
 import { decodeLayout } from '../perception/outline';
-import { digestText } from '../perception/layout';
+import { digestText, layoutSignal, layoutRole } from '../perception/layout';
+import type { LayoutNode } from '../perception/layout';
 import { changedSources } from '../interaction/resolve';
 
 const load = (page: string): Capture =>
@@ -89,5 +90,36 @@ describe('tier 2: layout snapshot', () => {
       .map(l => l.trim());
     expect(lines).toContain('[e3] textbox "Full name" (required) = "Ada Lovelace"');
     expect(lines.some(l => /clickable "Shipping details/.test(l))).toBe(false);
+  });
+
+  it('detects and enriches styled MCQ options and hidden radio containers', () => {
+    const optionNode: LayoutNode = {
+      index: 1,
+      backendNodeId: 101,
+      parent: 0,
+      tag: 'div',
+      attrs: { class: 'styledComponents__OptionItem-cujHsv' },
+      bounds: [100, 200, 300, 40],
+      client: [100, 200, 300, 40],
+      styles: { cursor: 'pointer' },
+      clickable: false,
+      scrollable: false,
+      checked: false,
+    };
+    const parentNode: LayoutNode = {
+      index: 0,
+      backendNodeId: 100,
+      parent: -1,
+      tag: 'div',
+      attrs: { class: 'styledComponents__OptionList' },
+      bounds: [100, 200, 300, 200],
+      client: [100, 200, 300, 200],
+      styles: { cursor: 'pointer' },
+      clickable: false,
+      scrollable: false,
+      checked: false,
+    };
+    expect(layoutSignal(optionNode, parentNode)).toBe('pointer cursor');
+    expect(layoutRole(optionNode, 'option')).toBe('radio');
   });
 });

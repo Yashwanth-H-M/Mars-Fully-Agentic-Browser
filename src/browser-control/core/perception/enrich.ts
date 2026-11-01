@@ -43,7 +43,7 @@ function findOptionLabel(doc: LayoutDocument, node: LayoutNode): string | undefi
   // 1. Direct <label> wrapper or label[for]
   const labels = labelsOf(doc, node);
   for (const l of labels) {
-    const t = (doc.digest(l.index, 250) || doc.text(l.index, 250)).trim();
+    const t = (doc.text(l.index, 250) || doc.digest(l.index, 250)).trim();
     if (t) return t;
   }
   // 2. aria-label or title
@@ -54,14 +54,14 @@ function findOptionLabel(doc: LayoutDocument, node: LayoutNode): string | undefi
   let depth = 0;
   while (p && depth < 4) {
     if (p.tag === 'body' || p.tag === 'html') break;
-    const t = doc.digest(p.index, 250).trim();
+    const t = (doc.text(p.index, 250) || doc.digest(p.index, 250)).trim();
     if (t.length > 0 && t.length < 250) {
       return t;
     }
     p = doc.byIndex[p.parent];
     depth++;
   }
-  return undefined;
+  return node.attrs.value?.trim() || undefined;
 }
 
 function findActionableNameOrTooltip(doc: LayoutDocument, node: LayoutNode): string | undefined {
@@ -199,16 +199,43 @@ export function enrichFrame(
       node.attrs.role === 'radio' ||
       node.attrs.role === 'checkbox';
 
-    // A native checkbox or radio that is not rendered (display: none): promoted onto its visible label.
+    const isHiddenInput =
+      !node.bounds ||
+      (node.bounds[2] <= 1 && node.bounds[3] <= 1) ||
+      node.styles.opacity === '0' ||
+      node.styles.display === 'none' ||
+      node.styles.visibility === 'hidden' ||
+      node.bounds[0] < -200 ||
+      node.bounds[1] < -200;
+
+    // A native checkbox or radio that is not rendered (display: none, opacity: 0): promoted onto its visible label or container.
     if (
       node.tag === 'input' &&
       (node.attrs.type === 'checkbox' || node.attrs.type === 'radio') &&
-      !node.bounds &&
+      isHiddenInput &&
       !byBackend.has(node.backendNodeId)
     ) {
-      const label = labelsOf(doc, node).find(isRendered);
+      let label = labelsOf(doc, node).find(isRendered);
+      if (!label) {
+        let p = doc.byIndex[node.parent];
+        let depth = 0;
+        while (p && depth < 5) {
+          if (p.tag === 'body' || p.tag === 'html') break;
+          if (isRendered(p)) {
+            label = p;
+            break;
+          }
+          p = doc.byIndex[p.parent];
+          depth++;
+        }
+      }
       if (!label) continue;
-      const name = findOptionLabel(doc, node) || doc.text(label.index);
+      const name =
+        findOptionLabel(doc, node) ||
+        doc.text(label.index) ||
+        doc.digest(label.index) ||
+        node.attrs.value ||
+        '';
       const created: ONode = {
         kind: 'element',
         rawRole: node.attrs.type,
@@ -216,8 +243,8 @@ export function enrichFrame(
         name,
         states: [node.checked ? 'checked' : 'unchecked'],
         actionable: true,
-        backendNodeId: node.backendNodeId,
-        layout: { tag: node.tag, digest: '', names: nameSources(doc, node) },
+        backendNodeId: label.tag === 'label' ? node.backendNodeId : label.backendNodeId,
+        layout: { tag: label.tag, digest: '', names: nameSources(doc, node) },
         note: 'hidden input, acted on through its label',
         children: [],
         ...base,
@@ -282,7 +309,13 @@ export function enrichFrame(
     const hasAriaInteractive = ['button', 'link', 'radio', 'checkbox', 'tab', 'menuitem'].includes(
       node.attrs.role ?? '',
     );
-    if (isContainerTag && !hasAriaInteractive && !node.scrollable && !isEditor) {
+    const isOptionOrItem =
+      isRadioOrCheck ||
+      signal === 'option' ||
+      /(option|choice|answer|radio|item|quiz-option|select-item)/i.test(
+        (node.attrs.class ?? '') + ' ' + (node.attrs.id ?? ''),
+      );
+    if (isContainerTag && !hasAriaInteractive && !node.scrollable && !isEditor && !isOptionOrItem) {
       const textLen = (doc.text(node.index) || '').length;
       if (textLen > 35) continue;
     }
@@ -302,7 +335,16 @@ export function enrichFrame(
             ''
           : doc.text(node.index) || node.attrs['aria-label'] || node.attrs.title || '';
 
-    if (isForfeitAction(name)) {
+    const isForfeit = (n: LayoutNode): boolean => {
+      for (let p: LayoutNode | undefined = n; p; p = doc.byIndex[p.parent]) {
+        const t = (doc.text(p.index) || doc.digest(p.index) || p.attrs['aria-label'] || p.attrs.title || '').trim();
+        if (isForfeitAction(t)) return true;
+        if (p.tag === 'body' || p.tag === 'html') break;
+      }
+      return false;
+    };
+
+    if (isForfeitAction(name) || isForfeit(node)) {
       continue;
     }
 

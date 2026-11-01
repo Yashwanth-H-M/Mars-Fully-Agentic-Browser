@@ -304,18 +304,30 @@ export function isNativeControl(node: LayoutNode): boolean {
 
 /** The layout signals for one node: why it looks actionable, or null. */
 export function layoutSignal(node: LayoutNode, parent: LayoutNode | undefined): string | null {
-  // A label acts through its control, which is listed itself (a hidden one is promoted onto the label).
   if (node.tag === 'body' || node.tag === 'html' || node.tag === 'label') return null;
   if (isNativeControl(node)) return 'native control';
   if ('contenteditable' in node.attrs && node.attrs.contenteditable !== 'false') return 'contenteditable';
   const tabindex = Number(node.attrs.tabindex);
   if ('tabindex' in node.attrs && Number.isFinite(tabindex) && tabindex >= 0) return 'tabindex';
   if (node.clickable) return 'click listener';
-  if (node.styles.cursor === 'pointer' && parent?.styles.cursor !== 'pointer') return 'pointer cursor';
+  if (node.styles.cursor === 'pointer') {
+    const parentIsContainer =
+      !parent ||
+      ['div', 'section', 'ul', 'ol', 'form', 'main', 'article', 'nav', 'header', 'footer'].includes(parent.tag);
+    if (parent?.styles.cursor !== 'pointer' || parentIsContainer) return 'pointer cursor';
+  }
   if (node.scrollable) return 'scrollable';
-  const cls = node.attrs.class ?? '';
+  const cls = (node.attrs.class ?? '') + ' ' + (node.attrs.id ?? '');
   if (/(monaco-editor|ace_editor|CodeMirror|cm-editor|code-editor)/i.test(cls) || 'data-mode-id' in node.attrs) {
     return 'code editor';
+  }
+  if (
+    /(styledComponents__Option|QuestionOption|question-option|option-item|mcq-option|OptionContainer|OptionRow|choice-item|answer-choice)/i.test(
+      cls,
+    ) &&
+    ['div', 'li', 'span', 'p'].includes(node.tag)
+  ) {
+    return 'option';
   }
   return null;
 }
@@ -326,6 +338,7 @@ export function layoutRole(node: LayoutNode, signal: string): string {
   if (signal === 'scrollable') return 'scrollable';
   if (node.tag === 'input')
     return node.attrs.type === 'checkbox' ? 'checkbox' : node.attrs.type === 'radio' ? 'radio' : 'textbox';
+  if (signal === 'option' || node.attrs.role === 'option') return 'radio';
   if (node.tag === 'a') return 'link';
   if (node.tag === 'select') return 'combobox';
   if (node.tag === 'textarea') return 'textbox';

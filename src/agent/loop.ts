@@ -202,6 +202,8 @@ export class AgentLoop {
   #overflowStage = 0;
   /** The notice for a refused reasoning option was written: once per run. */
   #droppedNoted = false;
+  /** Timestamp when the previous turn completed inference, for cloud rate pacing. */
+  #lastTurnEnd = 0;
 
   get debt(): DebtEntry[] {
     return this.#debt;
@@ -233,7 +235,8 @@ export class AgentLoop {
     const threshold = this.#turns < this.#cooldownUntil ? limit : contextThreshold(profile, window);
     let tokens = this.estimate(request);
     let rebuilt: Request | undefined;
-    if (tokens > threshold / 2) {
+    const elisionTrigger = Math.min(threshold / 2, 16_000);
+    if (tokens > elisionTrigger) {
       const plan = planElision(await activeBranch(this.options.conversationId));
       const saved = plan.reduce((n, e) => n + e.saved, 0) / 4;
       if (plan.length && (tokens > threshold || saved >= elisionChunk(window))) {
@@ -837,8 +840,31 @@ export class AgentLoop {
         if (check.stop) return this.#end({ status: 'failed', outcome: 'failed', reason: check.stop, cause: 'context' });
         this.#turns++;
         emit({ type: 'turn_start', turn: this.#turns });
+        const isScriptedOrLocal =
+          this.options.model.chat.spec.kind === 'ollama' ||
+          this.options.model.chat.spec.modelName === 'scripted' ||
+          (this.options.model.chat.model as { provider?: string })?.provider === 'scripted';
+        if (this.#lastTurnEnd > 0 && !isScriptedOrLocal) {
+          const elapsed = Date.now() - this.#lastTurnEnd;
+          const minInterval = 1200;
+          if (elapsed < minInterval) {
+            await new Promise<void>(resolve => {
+              const timer = setTimeout(resolve, minInterval - elapsed);
+              signal.addEventListener(
+                'abort',
+                () => {
+                  clearTimeout(timer);
+                  resolve();
+                },
+                { once: true },
+              );
+            });
+            if (signal.aborted) return this.#end({ status: 'stopped' });
+          }
+        }
         const sent = check.request ?? request;
         const reply = await this.#stream(sent);
+        this.#lastTurnEnd = Date.now();
         emit({ type: 'turn_end', turn: this.#turns });
         if (reply === 'aborted') return this.#end({ status: 'stopped' });
         // A server that reports more input than the window truncated the request silently: the reply was written from a

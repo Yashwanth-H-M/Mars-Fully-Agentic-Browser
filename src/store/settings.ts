@@ -116,7 +116,10 @@ Repeat this 3-step loop for EVERY question until ALL questions in the quiz are f
    - Click "SUBMIT" / "Check Answer" / "Save & Next" to record the answer: click({ target: { ref: "<submit_ref>" } }).
 3. ADVANCE TO NEXT:
    - Click "NEXT" (or the forward arrow "→") to load the next question. NEVER click "End Practice"!
-4. COMPLETION:
+4. FINAL SUBMISSION & COMPLETION:
+   - When all questions are completed and the final screen shows "END ASSESSMENT" or "SUBMIT TEST":
+     ALWAYS click using the EXACT ref from the outline: click({ target: { ref: "<ref>" } }).
+     NEVER use target text like { text: "END ASSESSMENT" } because multiple header elements match that text.
    - ONLY call done({ outcome: "success", summary: "All questions attempted successfully." }) when all questions are answered and the final score/results screen appears!`,
     isBuiltIn: true,
   },
@@ -157,7 +160,11 @@ For EVERY question from question 1 until the entire quiz finishes:
 3. THIRD, click "NEXT" (or the forward arrow "→") to proceed to the next question:
    click({ target: { ref: "<next_ref>" } })
 4. REPEAT Steps 1–3 for ALL questions until all questions are answered.
-5. COMPLETION: ONLY call done({ outcome: "success", summary: "All questions attempted successfully." }) when the final score/results screen or scorecard appears!
+5. FINAL SUBMISSION & COMPLETION:
+   - When all questions are completed and the final screen shows "END ASSESSMENT" or "SUBMIT TEST":
+     ALWAYS click using the EXACT ref from the outline: click({ target: { ref: "<ref>" } }).
+     NEVER use target text like { text: "END ASSESSMENT" }.
+   - ONLY call done({ outcome: "success", summary: "All questions attempted successfully." }) when the final score/results screen or scorecard appears!
 
 # ERROR RESILIENCE
 - If an action returns NO_MATCH or NODE_DETACHED, call snapshot() to refresh refs.
@@ -248,7 +255,11 @@ For EVERY question:
    CRITICAL: NEVER CLICK "SUBMIT" BEFORE SELECTING AN ANSWER CHOICE!
 2. SECOND, click "SUBMIT" / "Save & Next".
 3. THIRD, click "NEXT" to advance to the next question.
-4. REPEAT Steps 1–3 for all questions until the final score/results screen appears. Only then call done.`,
+4. REPEAT Steps 1–3 for all questions.
+5. FINAL SUBMISSION & COMPLETION:
+   - When all questions are answered and the final screen shows "END ASSESSMENT" or "SUBMIT TEST":
+     ALWAYS click using the EXACT ref from outline: click({ target: { ref: "<ref>" } }).
+   - Call done({ outcome: "success", summary: "All questions attempted successfully." }) when the final score/results screen appears.`,
     isBuiltIn: true,
   },
   {

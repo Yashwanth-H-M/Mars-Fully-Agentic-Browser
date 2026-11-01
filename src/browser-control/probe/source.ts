@@ -866,7 +866,14 @@ export function probeMain(): void {
     /** The first rendered label of a checkbox or radio (a wrapping label, or one whose for names it). */
     labelFor(input: Element) {
       const labels = [...((input as HTMLInputElement).labels ?? [])];
-      return labels.find(l => l.getClientRects().length > 0 && l.getBoundingClientRect().width > 0) ?? null;
+      const found = labels.find(l => l.getClientRects().length > 0 && l.getBoundingClientRect().width > 0);
+      if (found) return found;
+      let p = input.parentElement;
+      while (p && p !== (input.ownerDocument || document).body) {
+        if (p.getClientRects().length > 0 && p.getBoundingClientRect().width > 0) return p;
+        p = p.parentElement;
+      }
+      return null;
     },
 
     /**
@@ -1152,6 +1159,14 @@ export function probeMain(): void {
         if (el.tagName === 'LABEL') {
           if ((el as HTMLLabelElement).control === target) return { accepted: true, kind: 'label' as const };
           break;
+        }
+        if (
+          target.tagName === 'INPUT' &&
+          ((target as HTMLInputElement).type === 'radio' || (target as HTMLInputElement).type === 'checkbox')
+        ) {
+          if (el.contains(target) && el !== (target.ownerDocument || document).body) {
+            return { accepted: true, kind: 'label' as const };
+          }
         }
         if (el.matches(INTERACTIVE)) break;
       }

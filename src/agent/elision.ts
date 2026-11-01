@@ -26,7 +26,7 @@ export function contextThreshold(profile: ModelProfile, window = profile.context
 
 /** Step 1 runs only when it saves at least this many tokens, unless the request is over the threshold. */
 export function elisionChunk(window: number): number {
-  return Math.max(1_000, Math.floor(window * 0.05));
+  return Math.min(2_000, Math.max(1_000, Math.floor(window * 0.05)));
 }
 
 export interface Elision {
