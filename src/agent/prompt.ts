@@ -68,10 +68,14 @@ Output tool calls immediately without conversational preamble or commentary. Do 
 
 4. DIAGNOSE ERRORS & SELF-HEAL:
    - If sample tests pass, click Submit!
+   - After Submit, check for verdict: when "Testcases Passed" or "Accepted" or "90/90" is shown, you have succeeded. Call done({ outcome: "success", summary: "All test cases passed." }).
    - If there is a compilation error or test failure, read the actual error output carefully:
      * Understand what the error says (e.g. redefinition of struct Node, class 'solution' not declared, type mismatch).
-     * If the template got corrupted, or you see "redefinition of struct Node" or "solution was not declared":
-       IMMEDIATELY click the Reset Code button ("⟲"), confirm "Reset to Default", call read() to copy the clean template, and insert your logic inside the class method without changing the class or method signature.
+     * If the template got corrupted, or you see "redefinition of struct Node", "cannot convert", or "solution was not declared":
+       IMMEDIATELY click the Reset Code button ("⟲"), confirm "Reset to Default" / "Yes, Confirm", call snapshot() to get the fresh editor ref, call read() to copy the clean template, and insert your logic inside the class method without changing the class or method signature.
+   - RESILIENCE & ERROR RECOVERY:
+     * If any tool returns [NODE_DETACHED] or [REF_UNKNOWN], NEVER retry the same ref! Call snapshot() to get fresh refs from the current page.
+     * To scroll to see more content, use scroll({ to: "bottom" }) or scroll({ deltaY: 500 }) without a target. Never scroll empty layout containers.
    - MODAL SAFETY: If a dialog asks "Replace your current code with your last submitted code?" (from clicking "{}"), always click CANCEL so you do not overwrite with an old question's code!
 
 5. QUIZZES, MCQs, MULTI-SELECT & MATCHING (STRICT ONE-TURN SOLVING):
