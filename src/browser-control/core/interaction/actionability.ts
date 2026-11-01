@@ -103,6 +103,12 @@ async function firstQuad(ctx: ToolContext, target: ResolvedTarget): Promise<Quad
   }
 }
 
+function quadPointAt(q: Quad, fx: number, fy: number): Point {
+  const x = (1 - fx) * (1 - fy) * q[0] + fx * (1 - fy) * q[2] + fx * fy * q[4] + (1 - fx) * fy * q[6];
+  const y = (1 - fx) * (1 - fy) * q[1] + fx * (1 - fy) * q[3] + fx * fy * q[5] + (1 - fx) * fy * q[7];
+  return { x, y };
+}
+
 async function checkOnce(ctx: ToolContext, target: ResolvedTarget, needs: Needs): Promise<Actionable> {
   const probe = ctx.tab().probe!;
   const name = target.description;
@@ -153,11 +159,59 @@ async function checkOnce(ctx: ToolContext, target: ResolvedTarget, needs: Needs)
   ) {
     throw new LayerError('NOT_VISIBLE', `${name} is outside the visible part of the page`);
   }
-  if (needs.pointer) await hitTest(ctx, target, b, chain, !!needs.overControls);
+  let selectedPoint = b;
+  let selectedChain = chain;
+  let selectedTop = top;
+  if (needs.pointer) {
+    try {
+      await hitTest(ctx, target, b, chain, !!needs.overControls);
+    } catch (err) {
+      if (err instanceof LayerError && err.code === 'OBSCURED' && again) {
+        let foundUnobscured = false;
+        const candidates = [
+          [0.5, 0.8],
+          [0.5, 0.2],
+          [0.2, 0.5],
+          [0.8, 0.5],
+          [0.2, 0.8],
+          [0.8, 0.8],
+        ];
+        for (const [fx, fy] of candidates) {
+          const altLocal = quadPointAt(again, fx, fy);
+          const altChain = await chainToTop(cdp, target.frames, target.frame, altLocal, root =>
+            probe.callGlobal(root, 'viewport'),
+          ).catch(() => null);
+          if (!altChain) continue;
+          const altTop = altChain[altChain.length - 1].point;
+          if (
+            altTop.x < 0 ||
+            altTop.y < 0 ||
+            altTop.x >= metrics.cssLayoutViewport.clientWidth ||
+            altTop.y >= metrics.cssLayoutViewport.clientHeight
+          ) {
+            continue;
+          }
+          try {
+            await hitTest(ctx, target, altLocal, altChain, !!needs.overControls);
+            selectedPoint = altLocal;
+            selectedChain = altChain;
+            selectedTop = altTop;
+            foundUnobscured = true;
+            break;
+          } catch {
+            // try next candidate point
+          }
+        }
+        if (!foundUnobscured) throw err;
+      } else {
+        throw err;
+      }
+    }
+  }
   // The wait above can last seconds, and it scrolls: the element that is now actionable must still be the one the
   // session was shown. A node hidden when it was resolved had nothing to compare until now.
   await assertAsShown(ctx, target, { context: true });
-  return { point: top, localPoint: b, chain, quad: again!, state };
+  return { point: selectedTop, localPoint: selectedPoint, chain: selectedChain, quad: again!, state };
 }
 
 /** The receives-events check: in the target's session, then at every process boundary up to the top. */
