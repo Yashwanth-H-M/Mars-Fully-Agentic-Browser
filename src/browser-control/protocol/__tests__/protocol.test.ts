@@ -10,6 +10,7 @@ import {
   isReadOnly,
   LayerError,
   listTools,
+  NavigateArgsSchema,
   TargetSchema,
   TOOL_SPECS,
   toolSpec,
@@ -36,6 +37,20 @@ describe('targets', () => {
     expect(DragArgsSchema.safeParse({ from: { ref: 'e1' }, to: { ref: 'e2' } }).success).toBe(true);
     expect(DragArgsSchema.safeParse({ target: { ref: 'e1' }, to: { ref: 'e2' } }).success).toBe(true);
     expect(DragArgsSchema.safeParse({ from: { ref: 'e1' } }).success).toBe(false);
+  });
+
+  it('parses navigate arguments resiliently', () => {
+    expect(NavigateArgsSchema.safeParse({ url: 'https://example.com' }).success).toBe(true);
+    expect(NavigateArgsSchema.safeParse({ action: 'back' }).success).toBe(true);
+    const aliased = NavigateArgsSchema.safeParse({ to: 'https://github.com' });
+    expect(aliased.success).toBe(true);
+    if (aliased.success) expect((aliased.data as { url?: string }).url).toBe('https://github.com');
+    const gotoWithUrl = NavigateArgsSchema.safeParse({ action: 'goto', url: 'https://example.com' });
+    expect(gotoWithUrl.success).toBe(true);
+    if (gotoWithUrl.success) {
+      expect((gotoWithUrl.data as { url?: string }).url).toBe('https://example.com');
+      expect((gotoWithUrl.data as { action?: string }).action).toBeUndefined();
+    }
   });
 });
 

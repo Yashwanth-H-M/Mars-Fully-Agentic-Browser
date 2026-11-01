@@ -134,11 +134,29 @@ export async function withPageState(
 }
 
 export async function navigate(ctx: ToolContext, args: NavigateArgs): Promise<ToolOutcome> {
-  const isNavAction = args.action && ['back', 'forward', 'reload'].includes(args.action);
-  if (!args.url && !isNavAction)
-    throw new LayerError('INVALID_ARGUMENT', 'navigate needs either a url or action ("back", "forward", "reload")');
-  if (args.url && isNavAction)
-    throw new LayerError('INVALID_ARGUMENT', 'navigate cannot take both a url and a history action');
+  let isNavAction = Boolean(args.action && ['back', 'forward', 'reload'].includes(args.action));
+  if (!args.url && !isNavAction) {
+    // Resilient fallback: extract URL if the model provided it in intent, target, or any other field
+    for (const val of Object.values(args as Record<string, unknown>)) {
+      if (typeof val === 'string') {
+        const match = val.match(/https?:\/\/[^\s"'<>]+/);
+        if (match) {
+          args.url = match[0];
+          break;
+        }
+      }
+    }
+    isNavAction = Boolean(args.action && ['back', 'forward', 'reload'].includes(args.action));
+  }
+  if (!args.url && !isNavAction) {
+    throw new LayerError(
+      'INVALID_ARGUMENT',
+      'navigate needs a url (e.g. navigate({ url: "https://example.com" })) or action ("back", "forward", "reload")',
+    );
+  }
+  if (args.url && isNavAction) {
+    delete args.action;
+  }
   const tab = ctx.tab();
   const allowed = ctx.controller.allowedFor(tab.tabId);
   const timeout = args.timeoutMs ?? NAVIGATION_TIMEOUT_MS;

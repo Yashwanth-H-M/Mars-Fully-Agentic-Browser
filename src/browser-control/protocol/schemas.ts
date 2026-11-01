@@ -194,11 +194,37 @@ export const WaitArgsSchema = z.strictObject({
   ms: z.number().int().min(0).max(60_000).optional(),
 });
 
-export const NavigateArgsSchema = z.strictObject({
-  ...actionCommon,
-  url: z.string().optional(),
-  action: z.enum(['back', 'forward', 'reload', 'open', 'goto', 'navigate']).optional(),
-});
+export const NavigateArgsSchema = z.preprocess(
+  arg => {
+    if (arg && typeof arg === 'object') {
+      const a = { ...(arg as Record<string, unknown>) };
+      // Map aliases for url (e.g. to, target, href, link, address, path)
+      if (!a.url) {
+        for (const key of ['to', 'target', 'href', 'link', 'address', 'path'] as const) {
+          if (typeof a[key] === 'string' && /^https?:\/\//i.test(a[key] as string)) {
+            a.url = a[key];
+            delete a[key];
+            break;
+          }
+        }
+      }
+      // If action was passed as goto, open, or navigate, strip it so it doesn't conflict with url
+      if (a.action === 'goto' || a.action === 'open' || a.action === 'navigate') {
+        delete a.action;
+      }
+      return a;
+    }
+    return arg;
+  },
+  z.strictObject({
+    ...actionCommon,
+    url: z.string().optional().describe('The URL to navigate to (e.g. "https://example.com"). Required when visiting a website.'),
+    action: z
+      .enum(['back', 'forward', 'reload'])
+      .optional()
+      .describe('History navigation only: "back", "forward", or "reload". Do NOT use for going to a URL.'),
+  }),
+);
 
 export const TabsArgsSchema = z.strictObject({
   intent: readCommon.intent,
