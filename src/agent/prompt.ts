@@ -59,23 +59,29 @@ BRANCH B: CODING QUESTION (Has Code Editor & Run Button)
 Never click Submit in same turn as Run! 6-step loop:
 
 1. Inspect Starter Code & Casing:
-   - Call read({ ref: "<editor_ref>", format: "text" }) to read the prefilled template.
-   - STRICT PREFILLED CODE RULE (CASE-SENSITIVE):
-     * If starter code exists: The platform test runner links to the EXACT class and method names. Strictly preserve all prefilled starter code, comments, structs, class names, and method signatures without altering or deleting them!
-     * Match casing strictly: If starter has "class solution" (lowercase 's'), KEEP "class solution"! If "class Solution", KEEP "class Solution". Never change class name casing!
-     * Function body only: Only write the logic inside the prefilled function body (or helper methods). NEVER add int main() when starter code or classes are provided (doing so creates a fatal 'conflicting declaration of C function int main' compiler error).
+   - Call read({ ref: "<editor_ref>", format: "text" }) to get the exact prefilled template.
+   - IMMUTABLE TEMPLATE SPLICING (SLOT-FILLING RULE):
+     * The prefilled template is immutable skeleton code. Treat it as [PREFIX] + YOUR_CODE + [SUFFIX].
+     * NEVER invent or add #include <bits/stdc++.h> or using namespace std; unless they were literally present in the starter code from read!
+     * NEVER re-declare struct Node or class Node if already defined or commented by the platform.
+     * Strictly preserve class and method casing: If "class solution", KEEP "class solution"! If "class Solution", KEEP "class Solution"!
+     * Only insert algorithm logic between { and } of the target method.
+     * NEVER add int main() when starter code or classes exist (causes fatal 'conflicting declaration of C function int main' compiler error).
      * Blank/empty editor only: If and ONLY IF the editor is completely empty with 0 starter code/classes, write a standalone program with #include, using namespace std;, and int main() reading cin and printing cout.
    - Match language and formulate O(N) or O(N log N) algorithm.
 2. Set Code:
-   - ALWAYS use set({ target: { ref: "<editor_ref>" }, value: "<complete_code>" }) to write code.
+   - Concatenate the exact prefilled skeleton with your method body and write with:
+     set({ target: { ref: "<editor_ref>" }, value: "<complete_code>" }).
+   - Target ref format: Always pass the clean ref without square brackets (e.g. "bi768", NOT "[bi768]").
    - NEVER use type() on code editors (type appends at cursor, corrupting code; set cleanly replaces the entire editor).
    - Never use fill_form on editors.
    - 100% valid code: matching braces, all return paths covered.
 3. Run & Wait:
-   - click({ target: { ref: "<run_ref>" } }) + wait({ ms: 3000 }). STOP; do not submit.
-4. Diagnose & Fix (SEE ERROR FIRST, THEN SOLVE — NEVER GUESS):
-   - Call snapshot({ mode: 'all' }) to read compiler output/diff from DOM.
-   - If error mentions 'solution' vs 'Solution', fix class casing to match what grader expects!
+   - click({ target: { ref: "<run_ref>" } }) + wait({ ms: 3000 }). STOP; do not submit and do not call set() yet!
+4. Diagnose & Fix (ALWAYS OBSERVE BEFORE RE-ACTING):
+   - MANDATORY: Call snapshot({ mode: 'all' }) immediately after wait to observe testcase output and compiler errors!
+   - NEVER call set() or find() immediately after Run without a fresh snapshot first (elements become stale).
+   - If compiler error mentions 'solution' vs 'Solution', fix class casing to match what grader expects!
    - Fix with set and re-run until all sample tests pass.
 5. Submit & Verify:
    - Only when sample tests pass: click({ target: { ref: "<submit_ref>" } }) + wait({ ms: 3000 }).
