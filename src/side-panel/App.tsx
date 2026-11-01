@@ -1,9 +1,9 @@
 // The side panel. A view: it draws the worker's events and sends commands; it holds no state a run depends on, and it
 // never reads the conversation stores.
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore } from 'react';
-import { capabilityOf, DEFAULT_SETTINGS, keysStorage, providersStorage, settingsStorage } from '@src/store/settings';
-import type { ProviderConfig } from '@src/store/settings';
-import type { LivePair, ModelRef, PermissionMode } from '@src/store/types';
+import { capabilityOf, DEFAULT_SETTINGS, DEFAULT_PROMPT_PRESETS, keysStorage, providersStorage, settingsStorage } from '@src/store/settings';
+import type { ProviderConfig, Settings } from '@src/store/settings';
+import type { Entry, LivePair, ModelRef, PermissionMode } from '@src/store/types';
 import { makePair } from '@src/llm/profiles';
 import type { ReasoningEffort } from '@src/llm/catalogue';
 import { useStorage } from '@src/ui/hooks';
@@ -15,7 +15,7 @@ import type { LauncherItem, ModelChoice, PendingFile } from './Composer';
 import { attachmentKind, MAX_FILE, MAX_FILES } from '@src/store/attachments';
 import { voiceLanguage, voiceSetup } from '@src/ui/voice';
 import { transcribeAudio } from '@src/llm/transcribe';
-import { newId, putBlob } from '@src/store/conversations';
+import { activeBranch, newId, putBlob } from '@src/store/conversations';
 import { INITIAL, isActive, reduce } from './state';
 import { Transcript } from './Transcript';
 import { HistoryDrawer } from './History';
@@ -66,76 +66,291 @@ function downloadText(filename: string, text: string): void {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-/** Formats the session's full activity and tool trace for Windows Notepad (.txt with CRLF). */
-function generateNotepadLog(state: typeof INITIAL): string {
+/** Formats the session's complete inch-to-inch activity, reasoning, prompts, and tool trace for Windows Notepad (.txt with CRLF). */
+async function generateDetailedNotepadLog(
+  state: typeof INITIAL,
+  branchEntries?: Entry[],
+  settings?: Settings,
+): Promise<string> {
   const lines: string[] = [];
   const divider = '='.repeat(70);
   const subDivider = '-'.repeat(70);
+  const sectionDivider = '~'.repeat(70);
+
+  const activePreset =
+    settings?.customPrompts?.find(p => p.id === settings?.activePromptId) ||
+    DEFAULT_PROMPT_PRESETS.find(p => p.id === settings?.activePromptId) ||
+    DEFAULT_PROMPT_PRESETS[0];
 
   lines.push(divider);
-  lines.push(' MARS FULLY AGENTIC BROWSER - DEBUG RUN LOG');
-  lines.push(` Export Date: ${new Date().toLocaleString()}`);
+  lines.push(' MARS FULLY AGENTIC BROWSER - DETAILED EXECUTION AUDIT & DEBUG LOG');
+  lines.push(` Export Date: ${new Date().toLocaleString()} (ISO: ${new Date().toISOString()})`);
   lines.push(` Conversation ID: ${state.conversationId ?? 'Current Session'}`);
   lines.push(` Status: ${state.status}`);
   if (state.live?.model) {
-    lines.push(` Model: ${state.live.model.model} (${state.live.model.providerId})`);
+    lines.push(` Model: ${state.live.model.model} (Provider: ${state.live.model.providerId})`);
+    lines.push(` Reasoning Effort: ${state.live.reasoning ?? 'none'}`);
+  }
+  lines.push(` Active Preset: ${activePreset?.name || 'Default'} (${activePreset?.id || 'default'})`);
+  if (state.tabs && state.tabs.length > 0) {
+    lines.push(` Connected Tabs (${state.tabs.length}):`);
+    for (const t of state.tabs) {
+      lines.push(`   - Tab ${t.tabId}: "${t.title || 'Untitled'}" [${t.url || 'No URL'}]`);
+    }
   }
   lines.push(divider);
   lines.push('');
 
-  if (state.entries.length === 0) {
-    lines.push('No activity recorded yet in this session.');
+  // 1. System Prompt Section
+  lines.push('[ACTIVE SYSTEM PROMPT CONFIGURATION]');
+  lines.push(subDivider);
+  if (activePreset?.prompt) {
+    lines.push(activePreset.prompt.trim());
+  } else {
+    lines.push('(Default System Prompt)');
   }
+  lines.push(subDivider);
+  lines.push('');
 
-  for (const entry of state.entries) {
-    const time = entry.at ? new Date(entry.at).toLocaleTimeString() : '';
-    if (entry.kind === 'user') {
-      lines.push(`[${time}] USER PROMPT:`);
-      lines.push(entry.text);
-      lines.push(subDivider);
-      lines.push('');
-    } else if (entry.kind === 'assistant') {
-      lines.push(`[${time}] MARS AGENT ACTIVITY:`);
-      if (entry.tools && entry.tools.length > 0) {
-        lines.push('Actions & Tool Calls:');
-        for (const tool of entry.tools) {
-          const status =
-            tool.status === 'done' ? '[OK]' : tool.status === 'failed' ? '[FAILED]' : `[${tool.status.toUpperCase()}]`;
-          lines.push(`  ${status} Tool: ${tool.tool}`);
-          if (tool.args) {
-            lines.push(`       Arguments: ${JSON.stringify(tool.args, null, 2).replace(/\n/g, '\n       ')}`);
+  // 2. Execution Timeline:
+  lines.push('[DETAILED EXECUTION TIMELINE & INCH-TO-INCH TRACE]');
+  lines.push(sectionDivider);
+  lines.push('');
+
+  if (branchEntries && branchEntries.length > 0) {
+    let turnCount = 0;
+    for (const entry of branchEntries) {
+      const time = entry.at ? new Date(entry.at).toLocaleTimeString() : '';
+      const isoTime = entry.at || '';
+
+      if (entry.type === 'message') {
+        const { role, parts } = entry.message;
+
+        if (role === 'user') {
+          turnCount++;
+          lines.push(`[${time}] USER PROMPT (Turn ${turnCount}) [Entry ID: ${entry.id}] [${isoTime}]:`);
+
+          // User text
+          const userTexts = parts.filter(p => p.type === 'text' && !p.attached).map(p => (p as { text: string }).text);
+          if (userTexts.length) {
+            lines.push('User Message:');
+            lines.push(`  ${userTexts.join('\n  ')}`);
           }
-          if (tool.text) {
-            lines.push(`       Observation/Text: ${tool.text.split('\n')[0]}`);
+
+          // Attached page outline at start of turn
+          const outlinePart = parts.find(p => p.type === 'text' && p.attached?.kind === 'outline');
+          if (outlinePart && outlinePart.type === 'text') {
+            lines.push('');
+            lines.push(`Attached Page Observation (Initial Snapshot at Run Start) [${outlinePart.attached?.label || 'outline'}]:`);
+            lines.push('----------------------------------------------------------------------');
+            lines.push(outlinePart.text);
+            lines.push('----------------------------------------------------------------------');
           }
-          if (tool.result) {
-            const resObj = tool.result as Record<string, unknown>;
-            const err = resObj?.error as { code?: string; message?: string } | undefined;
-            if (err) {
-              lines.push(`       Error: [${err.code ?? ''}] ${err.message || ''}`);
+
+          // Attached files
+          const files = parts.filter(p => p.type === 'attachment');
+          if (files.length) {
+            lines.push(`Attached Files: ${files.map(f => (f as { name: string }).name).join(', ')}`);
+          }
+
+          // Selections
+          const quotes = parts.filter(p => p.type === 'selection');
+          if (quotes.length) {
+            for (const q of quotes) {
+              const sel = q as { text: string; url: string; title: string };
+              lines.push(`Selected Text from "${sel.title || sel.url}": "${sel.text}"`);
+            }
+          }
+
+          lines.push(subDivider);
+          lines.push('');
+        } else if (role === 'assistant') {
+          lines.push(`[${time}] MARS AGENT ACTIVITY (Turn ${turnCount} Reply) [Entry ID: ${entry.id}] [${isoTime}]:`);
+
+          // Metadata: Model, Tokens, Latency
+          if (entry.meta) {
+            const m = entry.meta;
+            lines.push(`Model: ${m.model?.model ?? 'default'} (Provider: ${m.model?.providerId ?? 'default'})`);
+            if (m.durationMs !== undefined) lines.push(`Inference Latency: ${m.durationMs} ms`);
+            if (m.usage) {
+              const tokIn = m.usage.input ?? 0;
+              const tokOut = m.usage.output ?? 0;
+              const tokReas = m.usage.reasoning ?? 0;
+              lines.push(`Token Usage: Input: ${tokIn} | Output: ${tokOut} | Reasoning: ${tokReas} | Total: ${tokIn + tokOut} tokens`);
+            }
+            if (m.stopReason) lines.push(`Stop Reason: ${m.stopReason}`);
+            if (m.reasoning) lines.push(`Wire Effort: ${m.reasoning}`);
+          }
+
+          // Thinking / Reasoning
+          const reasoning = entry.meta?.reasoningText;
+          if (reasoning) {
+            lines.push('');
+            lines.push('MODEL REASONING / BRAIN TRACE (What it was thinking):');
+            lines.push('----------------------------------------------------------------------');
+            lines.push(reasoning);
+            lines.push('----------------------------------------------------------------------');
+          }
+
+          // Tool calls emitted by model
+          const toolCalls = parts.filter(p => p.type === 'tool-call');
+          if (toolCalls.length > 0) {
+            lines.push('');
+            lines.push(`Actions & Tool Calls Dispatched (${toolCalls.length}):`);
+            for (const tc of toolCalls) {
+              if (tc.type === 'tool-call') {
+                lines.push(`  Tool: ${tc.toolName} (Call ID: ${tc.toolCallId})`);
+                lines.push(`  Full Input Arguments:`);
+                lines.push(`    ${JSON.stringify(tc.input, null, 2).replace(/\n/g, '\n    ')}`);
+              }
+            }
+          }
+
+          // Conversational text
+          const textParts = parts.filter(p => p.type === 'text').map(p => (p as { text: string }).text);
+          if (textParts.length > 0 && textParts.join('').trim()) {
+            lines.push('');
+            lines.push('Agent Text Response:');
+            lines.push(`  ${textParts.join('\n  ')}`);
+          }
+
+          lines.push(subDivider);
+          lines.push('');
+        } else if (role === 'tool') {
+          lines.push(`[${time}] TOOL EXECUTION RECEIPT [Entry ID: ${entry.id}] [${isoTime}]:`);
+          for (const p of parts) {
+            if (p.type === 'tool-result') {
+              lines.push(`Tool: ${p.toolName} (Call ID: ${p.toolCallId})`);
+              lines.push(`Status: ${p.isError ? '[FAILED]' : '[OK - SUCCESS]'}`);
+              lines.push('Observation Text Seen by Model:');
+              lines.push('  ' + p.text.replace(/\n/g, '\n  '));
+            }
+          }
+          if (entry.result) {
+            lines.push('Structured Layer Result / Receipt Data:');
+            lines.push(`  ${JSON.stringify(entry.result, null, 2).replace(/\n/g, '\n  ')}`);
+          }
+          lines.push(subDivider);
+          lines.push('');
+        }
+
+        // App-owned messages (headers & notices)
+        if (entry.appOwned) {
+          if (entry.appOwned.kind === 'header') {
+            lines.push(`[${time}] BROWSER STATE / PAGE HEADER [${isoTime}]:`);
+            for (const p of parts) {
+              if (p.type === 'text') lines.push('  ' + p.text.replace(/\n/g, '\n  '));
+            }
+            lines.push(subDivider);
+            lines.push('');
+          } else if (entry.appOwned.kind === 'notice') {
+            lines.push(`[${time}] SYSTEM NOTICE:`);
+            for (const p of parts) {
+              if (p.type === 'text') lines.push('  ' + p.text.replace(/\n/g, '\n  '));
+            }
+            lines.push(subDivider);
+            lines.push('');
+          }
+        }
+      } else if (entry.type === 'compaction') {
+        lines.push(`[${time}] CONTEXT COMPACTION EVENT:`);
+        lines.push(`Tokens: ${entry.tokensBefore} -> ${entry.tokensAfter}`);
+        if (entry.summary) lines.push(`Summary: ${entry.summary}`);
+        if (entry.ledger && entry.ledger.length > 0) {
+          lines.push('Action Ledger:');
+          for (const l of entry.ledger) {
+            lines.push(`  [Turn ${l.turn}] [${l.kind.toUpperCase()}] ${l.text}`);
+          }
+        }
+        lines.push(subDivider);
+        lines.push('');
+      } else if (entry.type === 'ui') {
+        lines.push(`[${time}] UI INTERACTION (${entry.kind}):`);
+        lines.push(`  ${JSON.stringify(entry.data, null, 2).replace(/\n/g, '\n  ')}`);
+        lines.push(subDivider);
+        lines.push('');
+      }
+    }
+  } else {
+    // Fallback to state.entries if branch is not yet populated
+    if (state.entries.length === 0) {
+      lines.push('No activity recorded yet in this session.');
+    }
+    for (const entry of state.entries) {
+      const time = entry.at ? new Date(entry.at).toLocaleTimeString() : '';
+      if (entry.kind === 'user') {
+        lines.push(`[${time}] USER PROMPT:`);
+        lines.push(`  ${entry.text.replace(/\n/g, '\n  ')}`);
+        lines.push(subDivider);
+        lines.push('');
+      } else if (entry.kind === 'assistant') {
+        lines.push(`[${time}] MARS AGENT ACTIVITY:`);
+        if (entry.model) {
+          lines.push(`Model: ${entry.model.model} (${entry.model.providerId})`);
+        }
+        if (entry.durationMs) {
+          lines.push(`Latency: ${entry.durationMs} ms`);
+        }
+        if (entry.usage) {
+          lines.push(`Token Usage: Input: ${entry.usage.input} | Output: ${entry.usage.output} | Reasoning: ${entry.usage.reasoning ?? 0}`);
+        }
+        if (entry.reasoningText) {
+          lines.push('');
+          lines.push('MODEL REASONING / BRAIN TRACE (What it was thinking):');
+          lines.push('----------------------------------------------------------------------');
+          lines.push(entry.reasoningText);
+          lines.push('----------------------------------------------------------------------');
+        }
+        if (entry.tools && entry.tools.length > 0) {
+          lines.push('');
+          lines.push('Actions & Tool Calls:');
+          for (const tool of entry.tools) {
+            const status =
+              tool.status === 'done' ? '[OK - SUCCESS]' : tool.status === 'failed' ? '[FAILED]' : `[${tool.status.toUpperCase()}]`;
+            lines.push(`  ${status} Tool: ${tool.tool} (Call ID: ${tool.toolCallId})`);
+            if (tool.args) {
+              lines.push(`       Arguments: ${JSON.stringify(tool.args, null, 2).replace(/\n/g, '\n       ')}`);
+            }
+            if (tool.text) {
+              lines.push(`       Full Observation / Text:`);
+              lines.push(`         ${tool.text.replace(/\n/g, '\n         ')}`);
+            }
+            if (tool.result) {
+              lines.push(`       Structured Result:`);
+              lines.push(`         ${JSON.stringify(tool.result, null, 2).replace(/\n/g, '\n         ')}`);
             }
           }
         }
-      }
-      if (entry.text) {
+        if (entry.text) {
+          lines.push('');
+          lines.push('Agent Response:');
+          lines.push(`  ${entry.text.replace(/\n/g, '\n  ')}`);
+        }
+        lines.push(subDivider);
         lines.push('');
-        lines.push('Agent Response:');
-        lines.push(entry.text);
+      } else if (entry.kind === 'notice') {
+        lines.push(`[${time}] SYSTEM NOTICE (${entry.tone}): ${entry.text}`);
+        lines.push(subDivider);
+        lines.push('');
       }
-      lines.push(subDivider);
-      lines.push('');
-    } else if (entry.kind === 'notice') {
-      lines.push(`[${time}] SYSTEM NOTICE (${entry.tone}): ${entry.text}`);
-      lines.push('');
     }
   }
 
-  lines.push('[END OF LOG]');
+  lines.push(divider);
+  lines.push('[END OF DETAILED DEBUG LOG]');
   return lines.join('\r\n');
 }
 
-function downloadLogForNotepad(state: typeof INITIAL): void {
-  const log = generateNotepadLog(state);
+async function downloadLogForNotepad(state: typeof INITIAL, settings?: Settings): Promise<void> {
+  let branch: Entry[] | undefined;
+  if (state.conversationId) {
+    try {
+      branch = await activeBranch(state.conversationId);
+    } catch {
+      branch = undefined;
+    }
+  }
+  const log = await generateDetailedNotepadLog(state, branch, settings);
   const now = new Date();
   const pad = (n: number) => String(n).padStart(2, '0');
   const filename = `mars-log-${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}.txt`;
@@ -486,7 +701,7 @@ export function App() {
           <IconButton
             label="Save log for Notepad"
             title="Save log file (.txt for Notepad)"
-            onClick={() => downloadLogForNotepad(state)}>
+            onClick={() => void downloadLogForNotepad(state, settings)}>
             <FileIcon size={15} />
           </IconButton>
           <IconButton label={t('panel.newChat')} onClick={() => newChat(confirmNewChat)}>

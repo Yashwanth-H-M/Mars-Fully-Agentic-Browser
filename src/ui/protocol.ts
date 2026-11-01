@@ -126,6 +126,7 @@ export type DisplayEntry =
       kind: 'assistant';
       id: string;
       text: string;
+      reasoningText?: string;
       at: string;
       model?: ModelRef;
       usage?: Usage;

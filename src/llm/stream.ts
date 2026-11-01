@@ -41,6 +41,7 @@ export type TurnFinish =
 
 export interface TurnResult {
   text: string;
+  reasoningText?: string;
   toolCalls: ToolCallRequest[];
   finish: TurnFinish;
   /** Null when the server reported no usage. */
@@ -583,7 +584,14 @@ async function streamTurnNow(request: TurnRequest): Promise<TurnResult> {
       }
       const cost = usage && usage.cost === undefined ? await request.chat.takeCost?.() : undefined;
       if (usage && cost !== undefined) usage = { ...usage, cost };
-      return {
+      if (!reasoningText.trim()) {
+        const thinkMatch = text.match(/<think>([\s\S]*?)<\/think>/i);
+        if (thinkMatch) {
+          reasoningText = thinkMatch[1].trim();
+          text = text.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+        }
+      }
+      const turnResult: TurnResult = {
         text,
         toolCalls,
         finish,
@@ -595,6 +603,15 @@ async function streamTurnNow(request: TurnRequest): Promise<TurnResult> {
         ...(imagesDropped ? { imagesDropped } : {}),
         ...(reasoningIgnored ? { reasoningIgnored } : {}),
       };
+      if (reasoningText.trim()) {
+        Object.defineProperty(turnResult, 'reasoningText', {
+          value: reasoningText.trim(),
+          writable: true,
+          configurable: true,
+          enumerable: false,
+        });
+      }
+      return turnResult;
     }
     // The same request once more, not counted as an attempt: at Low's value when None's was refused, without the option
     // when a value was refused, or without its images when they were.

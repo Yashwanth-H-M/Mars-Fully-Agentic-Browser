@@ -51,6 +51,7 @@ export function assistantDisplay(entry: EntryOf<'message'>): Extract<DisplayEntr
     kind: 'assistant',
     id: entry.id,
     text,
+    ...(entry.meta?.reasoningText ? { reasoningText: entry.meta.reasoningText } : {}),
     at: entry.at,
     model: entry.meta?.model,
     usage: entry.meta?.usage,

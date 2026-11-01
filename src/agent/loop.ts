@@ -968,6 +968,7 @@ export class AgentLoop {
           meta: {
             model: model.ref,
             ...(sent && !reply.reasoningDropped ? { reasoning: sent } : {}),
+            ...(reply.reasoningText ? { reasoningText: reply.reasoningText } : {}),
             usage: reply.usage ? { ...ZERO_USAGE, ...reply.usage } : undefined,
             durationMs: reply.durationMs,
             stopReason: reply.finish,
