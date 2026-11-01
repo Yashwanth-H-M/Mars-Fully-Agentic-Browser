@@ -221,13 +221,65 @@ async function generateDetailedNotepadLog(
           for (const p of parts) {
             if (p.type === 'tool-result') {
               lines.push(`Tool: ${p.toolName} (Call ID: ${p.toolCallId})`);
-              lines.push(`Status: ${p.isError ? '[FAILED]' : '[OK - SUCCESS]'}`);
+              lines.push(`Execution Status: ${p.isError ? '[FAILED]' : '[OK - SUCCESS]'}`);
               lines.push('Observation Text Seen by Model:');
               lines.push('  ' + p.text.replace(/\n/g, '\n  '));
             }
           }
           if (entry.result) {
-            lines.push('Structured Layer Result / Receipt Data:');
+            const res = entry.result as {
+              receipt?: {
+                action?: string;
+                target?: string;
+                mechanism?: string;
+                dispatched?: boolean | string;
+                reachedTarget?: boolean;
+                effect?: { verdict?: string; signals?: string[] };
+                navigation?: { kind?: string; url?: string };
+                postcondition?: { status?: string; detail?: string };
+                allowedBy?: string;
+              };
+              error?: { code?: string; message?: string; detail?: string };
+              page?: { title?: string; url?: string; rev?: number; changed?: string };
+              pending?: Array<{ kind?: string; detail?: string }>;
+            };
+            if (res.receipt) {
+              const r = res.receipt;
+              lines.push('');
+              lines.push('Execution Logic & Layer Receipt:');
+              lines.push(`  Action: ${r.action || 'unknown'}`);
+              if (r.target) lines.push(`  Resolved Target: ${r.target}`);
+              if (r.mechanism) lines.push(`  Dispatch Mechanism: ${r.mechanism}`);
+              lines.push(`  CDP Dispatched: ${r.dispatched}`);
+              if (r.reachedTarget !== undefined) lines.push(`  Reached Target Element: ${r.reachedTarget}`);
+              if (r.effect) {
+                lines.push(`  Page Effect Verdict: ${r.effect.verdict || 'none'} (Signals: ${r.effect.signals?.join(', ') || 'none'})`);
+              }
+              if (r.navigation) {
+                lines.push(`  Page Navigation Triggered: [${r.navigation.kind || 'navigation'}] ${r.navigation.url}`);
+              }
+              if (r.postcondition) {
+                lines.push(`  Post-Condition State: ${r.postcondition.status}${r.postcondition.detail ? ` (${r.postcondition.detail})` : ''}`);
+              }
+              if (r.allowedBy) {
+                lines.push(`  Permission Mode / Allowed By: ${r.allowedBy}`);
+              }
+            }
+            if (res.error) {
+              lines.push('');
+              lines.push(`Execution Error: [${res.error.code || 'ERROR'}] ${res.error.message || ''}`);
+              if (res.error.detail) lines.push(`  Error Detail: ${res.error.detail}`);
+            }
+            if (res.page) {
+              lines.push('');
+              lines.push(`Page State After Action: "${res.page.title || ''}" [${res.page.url || ''}] (Rev: ${res.page.rev ?? 0}, Changed: ${res.page.changed || 'none'})`);
+            }
+            if (res.pending && res.pending.length > 0) {
+              lines.push('');
+              lines.push(`Modals Opened by Action: ${res.pending.map(m => `[${m.kind || 'modal'}] ${m.detail || ''}`).join(', ')}`);
+            }
+            lines.push('');
+            lines.push('Structured Layer Result / Full Data (Raw JSON):');
             lines.push(`  ${JSON.stringify(entry.result, null, 2).replace(/\n/g, '\n  ')}`);
           }
           lines.push(subDivider);
@@ -267,6 +319,22 @@ async function generateDetailedNotepadLog(
       } else if (entry.type === 'ui') {
         lines.push(`[${time}] UI INTERACTION (${entry.kind}):`);
         lines.push(`  ${JSON.stringify(entry.data, null, 2).replace(/\n/g, '\n  ')}`);
+        lines.push(subDivider);
+        lines.push('');
+      }
+    }
+
+    if (state.status === 'running') {
+      const runningTools = state.entries
+        .flatMap(e => (e.kind === 'assistant' ? e.tools : []))
+        .filter(t => t.status === 'running' || t.status === 'waiting');
+      if (runningTools.length > 0) {
+        lines.push('[CURRENT IN-FLIGHT TOOL EXECUTION]');
+        for (const t of runningTools) {
+          lines.push(`  [${t.status.toUpperCase()}] Tool: ${t.tool} (Call ID: ${t.toolCallId})`);
+          if (t.args) lines.push(`    Arguments: ${JSON.stringify(t.args, null, 2).replace(/\n/g, '\n    ')}`);
+          if (t.text) lines.push(`    Observation: ${t.text.replace(/\n/g, '\n    ')}`);
+        }
         lines.push(subDivider);
         lines.push('');
       }
@@ -316,7 +384,38 @@ async function generateDetailedNotepadLog(
               lines.push(`         ${tool.text.replace(/\n/g, '\n         ')}`);
             }
             if (tool.result) {
-              lines.push(`       Structured Result:`);
+              const res = tool.result as {
+                receipt?: {
+                  action?: string;
+                  target?: string;
+                  mechanism?: string;
+                  dispatched?: boolean | string;
+                  reachedTarget?: boolean;
+                  effect?: { verdict?: string; signals?: string[] };
+                  navigation?: { kind?: string; url?: string };
+                  postcondition?: { status?: string; detail?: string };
+                  allowedBy?: string;
+                };
+                error?: { code?: string; message?: string; detail?: string };
+                page?: { title?: string; url?: string; rev?: number; changed?: string };
+              };
+              if (res.receipt) {
+                const r = res.receipt;
+                lines.push(`       Execution Logic & Layer Receipt:`);
+                lines.push(`         Action: ${r.action || 'unknown'} | Mechanism: ${r.mechanism || 'pointer'} | Dispatched: ${r.dispatched}`);
+                if (r.target) lines.push(`         Resolved Target: ${r.target}`);
+                if (r.reachedTarget !== undefined) lines.push(`         Reached Target Element: ${r.reachedTarget}`);
+                if (r.effect) lines.push(`         Page Effect: ${r.effect.verdict || 'none'} (Signals: ${r.effect.signals?.join(', ') || 'none'})`);
+                if (r.navigation) lines.push(`         Page Navigation: [${r.navigation.kind || 'navigation'}] ${r.navigation.url}`);
+                if (r.allowedBy) lines.push(`         Allowed By: ${r.allowedBy}`);
+              }
+              if (res.error) {
+                lines.push(`       Execution Error: [${res.error.code || 'ERROR'}] ${res.error.message || ''}`);
+              }
+              if (res.page) {
+                lines.push(`       Page After Action: "${res.page.title || ''}" [${res.page.url || ''}]`);
+              }
+              lines.push(`       Structured Layer Result (Raw JSON):`);
               lines.push(`         ${JSON.stringify(tool.result, null, 2).replace(/\n/g, '\n         ')}`);
             }
           }
