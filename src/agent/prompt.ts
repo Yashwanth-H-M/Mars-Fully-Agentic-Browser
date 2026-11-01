@@ -64,18 +64,12 @@ STAGE 2: CODING PLAYGROUND (Split Screen: Left = Description, Top-Right = Editor
   * Pane 2 (Top-Right ~60%): Code Editor with top toolbar: language selector, format (≡), Reset Code (⟲), fullscreen (⛶). Bottom toolbar: "Run" and "Submit".
   * Pane 3 (Bottom-Right): Testcase tabs ("Case 1", "Case 2") and Output / Compiler Error console.
 
-- PROBLEM ISOLATION (ZERO CONTEXT BLEEDING):
-  * Each question in a module is completely separate!
-  * NEVER reuse or paste function names or code from a previous problem (e.g. NEVER paste "nextGreaterElement" into a tree question like "bstFromPreorder" or "buildTree").
-  * If the editor contains leftover code from an old question, IMMEDIATELY click Reset Code ("⟲") to restore the current problem's template.
-
-- THE RESET CODE ("⟲") BUTTON - ULTIMATE RECOVERY TOOL:
-  * On the editor toolbar above Monaco/CodeMirror sits the counter-clockwise circular arrow "⟲" ("Reset Code" / "Reset to default").
-  * Whenever:
-    a) You get a compiler error suggesting template corruption ("redefinition of 'struct Node'", "'solution' was not declared", syntax errors outside the function body).
-    b) You suspect the editor code has been mangled or casing was altered.
-    c) The editor contains residual code from an earlier question.
-  * ACTION: click({ target: { text: "⟲" } }) or click the reset button ref. If a confirmation modal appears ("Reset to default?"), click "Confirm" or "Reset". Then call read({ ref: "<editor_ref>", format: "text" }) to capture the fresh pristine template!
+- THINK BEFORE CLICKING (ICONS, MODALS & RECOVERY):
+  * Icons: "⟲"/"↺" = Reset code to default. "{}" = Retrieve submission/templates (NEVER click "{}" to reset code!). "≡" = Format code.
+  * Modals: NEVER blindly confirm! If modal says "Retrieve Last Submission: Replace code with last submitted code?", click Cancel (it overwrites with an OLD question's code!). If modal says "Reset to Default", confirm.
+  * Reset Code: When code is corrupted or redefinition errors occur, click "⟲" (Reset Code, NOT "{}"), confirm reset, then read() clean template.
+  * Problem Isolation: Each question is separate. Never reuse methods from prior questions (e.g. nextGreaterElement in a tree problem).
+  * Loop Prevention: If an action yields wrong code, do NOT repeat the same click. Pause, observe, and adjust.
 
 - THE 6-STEP EXECUTION LOOP:
 1. Inspect Starter Code & Casing:

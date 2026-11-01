@@ -63,6 +63,47 @@ function findOptionLabel(doc: LayoutDocument, node: LayoutNode): string | undefi
   return undefined;
 }
 
+function findActionableNameOrTooltip(doc: LayoutDocument, node: LayoutNode): string | undefined {
+  // 1. Direct attributes on the node
+  const direct =
+    node.attrs['aria-label'] ||
+    node.attrs.title ||
+    node.attrs['data-tooltip'] ||
+    node.attrs['data-title'] ||
+    node.attrs['data-original-title'] ||
+    node.attrs['aria-description'];
+  if (direct?.trim()) return direct.trim();
+
+  // 2. Scan direct children for tooltip attributes or short SVG/text content
+  for (let i = 0; i < doc.byIndex.length; i++) {
+    const c = doc.byIndex[i];
+    if (c && c.parent === node.index) {
+      const childAttr =
+        c.attrs['aria-label'] ||
+        c.attrs.title ||
+        c.attrs['data-tooltip'] ||
+        c.attrs['data-title'] ||
+        c.attrs['data-original-title'] ||
+        c.attrs['data-icon'];
+      if (childAttr?.trim()) return childAttr.trim();
+      const childText = doc.digest(c.index, 60).trim();
+      if (childText && childText.length < 60 && !childText.includes('\n')) return childText;
+    }
+  }
+
+  // 3. Inner text/digest of the node itself (e.g. "{}" or "⟲" or short symbol)
+  const domText = (doc.text(node.index, 60) || doc.digest(node.index, 60)).trim();
+  if (domText && domText.length < 60 && !domText.includes('\n')) return domText;
+
+  // 4. Semantic testid or id
+  const testId = node.attrs['data-testid'] || node.attrs.id;
+  if (testId && /(reset|submit|run|format|copy|clear|setting|fullscreen|theme|retrieve)/i.test(testId)) {
+    return testId.replace(/[-_]+/g, ' ');
+  }
+
+  return undefined;
+}
+
 export function enrichFrame(
   roots: ONode[],
   doc: LayoutDocument,
@@ -195,7 +236,13 @@ export function enrichFrame(
       }
     }
 
-    if (existing?.actionable) continue;
+    if (existing?.actionable) {
+      if (!existing.name) {
+        const candidate = findActionableNameOrTooltip(doc, node);
+        if (candidate) existing.name = candidate;
+      }
+      continue;
+    }
     if (!isRendered(node)) continue;
     const parent = doc.byIndex[node.parent];
     const signal = layoutSignal(node, parent);
