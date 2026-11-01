@@ -13,7 +13,8 @@ export function findChrome() {
   } catch {
     // No metadata: nothing was installed with pnpm install-chrome.
   }
-  const builds = stable && existsSync(dir) ? readdirSync(dir).filter(name => name.endsWith(`-${stable}`)) : [];
+  const allBuilds = existsSync(dir) ? readdirSync(dir) : [];
+  const builds = stable ? allBuilds.filter(name => name.endsWith(`-${stable}`)) : allBuilds;
   for (const build of builds) {
     const mac = join(
       dir,
@@ -26,7 +27,9 @@ export function findChrome() {
     );
     const macX64 = mac.replace('chrome-mac-arm64', 'chrome-mac-x64');
     const linux = join(dir, build, 'chrome-linux64', 'chrome');
-    for (const candidate of [mac, macX64, linux]) if (existsSync(candidate)) return candidate;
+    const win64 = join(dir, build, 'chrome-win64', 'chrome.exe');
+    const win32 = join(dir, build, 'chrome-win32', 'chrome.exe');
+    for (const candidate of [mac, macX64, linux, win64, win32]) if (existsSync(candidate)) return candidate;
   }
   throw new Error('Stable Chrome for Testing not found; run pnpm install-chrome or set CHROME_PATH');
 }

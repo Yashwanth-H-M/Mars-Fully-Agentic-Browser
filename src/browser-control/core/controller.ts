@@ -457,7 +457,7 @@ export function toProtocolError(error: unknown, readOnly: boolean): ProtocolErro
     error instanceof Error
       ? error.message
       : typeof error === 'object' && error !== null
-        ? (error as { message?: string }).message ?? JSON.stringify(error)
+        ? ((error as { message?: string }).message ?? JSON.stringify(error))
         : String(error);
   const code = (error as { code?: number })?.code;
   if (name === 'CdpTimeoutError' || name === 'TimeoutError') {
@@ -465,6 +465,9 @@ export function toProtocolError(error: unknown, readOnly: boolean): ProtocolErro
   }
   if (code === -32001 || /-32001|Session with given id not found/i.test(message)) {
     return new LayerError('FRAME_DETACHED', message, { delivered: readOnly ? false : 'unknown' }).toProtocol();
+  }
+  if (/Cannot find context/i.test(message)) {
+    return new LayerError('NODE_DETACHED', message, { delivered: readOnly ? false : 'unknown' }).toProtocol();
   }
   if (
     code === -32000 ||

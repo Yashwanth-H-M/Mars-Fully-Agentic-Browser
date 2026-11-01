@@ -68,7 +68,7 @@ export async function sendRaw<T = unknown>(
           error instanceof Error
             ? error.message
             : typeof error === 'object' && error !== null
-              ? (error as { message?: string }).message ?? JSON.stringify(error)
+              ? ((error as { message?: string }).message ?? JSON.stringify(error))
               : String(error);
         const code = (error as { code?: number })?.code;
         if (

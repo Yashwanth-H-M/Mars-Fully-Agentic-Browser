@@ -218,7 +218,10 @@ export const NavigateArgsSchema = z.preprocess(
   },
   z.strictObject({
     ...actionCommon,
-    url: z.string().optional().describe('The URL to navigate to (e.g. "https://example.com"). Required when visiting a website.'),
+    url: z
+      .string()
+      .optional()
+      .describe('The URL to navigate to (e.g. "https://example.com"). Required when visiting a website.'),
     action: z
       .enum(['back', 'forward', 'reload'])
       .optional()

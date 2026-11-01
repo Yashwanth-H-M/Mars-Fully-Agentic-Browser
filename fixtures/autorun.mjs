@@ -50,6 +50,7 @@ if (!flag('--no-build')) {
   execFileSync('corepack', ['pnpm', 'exec', 'wxt', 'build'], {
     cwd: root,
     stdio: ['ignore', 'ignore', 'inherit'],
+    shell: true,
     env: { ...process.env, WXT_AUTORUN_URL: base, ...(productPermissions ? { WXT_PRODUCT_PERMISSIONS: '1' } : {}) },
   });
 }

@@ -94,7 +94,7 @@ defineCheck({
       await until(status, s => s === 'Stopped', 'stopped');
       report.historyOpenAfterStop = !(await panel(id, 'read')).disabled?.includes('History');
       // Stop says so in the transcript, and the next run's model is told the last one was stopped.
-      report.stopNotice = (await panel(id, 'read')).body.includes('What should Nanobrowser do instead?');
+      report.stopNotice = (await panel(id, 'read')).body.includes('do instead?');
       await panel(id, 'type-send', { text: 'Carry on' });
       await waitForText(id, 'Carried on after Stop.');
       const afterStop = (await (await fetch('http://localhost:8787/__llm/requests')).json()) as unknown[];

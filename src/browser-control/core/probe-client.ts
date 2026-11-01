@@ -1,5 +1,5 @@
 // The probe's isolated worlds, one per frame and document, and node resolution into them.
-import { LayerError } from '../protocol/errors';
+import { isLayerError, LayerError } from '../protocol/errors';
 import { PROBE_SOURCE, PROBE_WORLD_NAME } from '../probe';
 import type { ProbeApi } from '../probe';
 import type { CdpPort, FrameRecord } from './ports';
@@ -91,41 +91,57 @@ export class ProbeClient {
 
   /** Calls a probe method with the node as its first argument. Arguments wrapped as `{ objectId }` pass nodes. */
   async call<T>(frame: FrameRecord, objectId: string, method: ProbeMethod, ...args: unknown[]): Promise<T> {
-    const response = await this.cdp.send<CallResult>(frame.sessionId, 'Runtime.callFunctionOn', {
-      objectId,
-      functionDeclaration: `function (...args) { return globalThis.__nbProbe[${JSON.stringify(method)}](this, ...args); }`,
-      arguments: args.map(value => (value instanceof NodeArg ? { objectId: value.objectId } : { value })),
-      returnByValue: true,
-      awaitPromise: true,
-    });
-    if (response.exceptionDetails) {
-      throw new Error(
-        `Probe ${method} failed: ${response.exceptionDetails.exception?.description ?? response.exceptionDetails.text}`,
-      );
+    try {
+      const response = await this.cdp.send<CallResult>(frame.sessionId, 'Runtime.callFunctionOn', {
+        objectId,
+        functionDeclaration: `function (...args) { return globalThis.__nbProbe[${JSON.stringify(method)}](this, ...args); }`,
+        arguments: args.map(value => (value instanceof NodeArg ? { objectId: value.objectId } : { value })),
+        returnByValue: true,
+        awaitPromise: true,
+      });
+      if (response.exceptionDetails) {
+        throw new Error(
+          `Probe ${method} failed: ${response.exceptionDetails.exception?.description ?? response.exceptionDetails.text}`,
+        );
+      }
+      return response.result.value as T;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (/Cannot find context/i.test(message) || (isLayerError(error) && error.code === 'FRAME_DETACHED')) {
+        throw new LayerError('NODE_DETACHED', `The element is no longer in the page (${message})`);
+      }
+      throw error;
     }
-    return response.result.value as T;
   }
 
   /** Calls a probe method that returns an element, and gives that element's backend node ID (or null). */
   async callForNode(frame: FrameRecord, objectId: string, method: ProbeMethod): Promise<number | null> {
-    const response = await this.cdp.send<CallResult>(frame.sessionId, 'Runtime.callFunctionOn', {
-      objectId,
-      functionDeclaration: `function () { return globalThis.__nbProbe[${JSON.stringify(method)}](this); }`,
-      returnByValue: false,
-    });
-    const node = response.result.objectId;
-    if (!node) return null;
     try {
-      const { node: described } = await this.cdp.send<{ node: { backendNodeId: number } }>(
-        frame.sessionId,
-        'DOM.describeNode',
-        {
-          objectId: node,
-        },
-      );
-      return described.backendNodeId;
-    } finally {
-      await this.release(frame, node);
+      const response = await this.cdp.send<CallResult>(frame.sessionId, 'Runtime.callFunctionOn', {
+        objectId,
+        functionDeclaration: `function () { return globalThis.__nbProbe[${JSON.stringify(method)}](this); }`,
+        returnByValue: false,
+      });
+      const node = response.result.objectId;
+      if (!node) return null;
+      try {
+        const { node: described } = await this.cdp.send<{ node: { backendNodeId: number } }>(
+          frame.sessionId,
+          'DOM.describeNode',
+          {
+            objectId: node,
+          },
+        );
+        return described.backendNodeId;
+      } finally {
+        await this.release(frame, node);
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (/Cannot find context/i.test(message) || (isLayerError(error) && error.code === 'FRAME_DETACHED')) {
+        throw new LayerError('NODE_DETACHED', `The element is no longer in the page (${message})`);
+      }
+      throw error;
     }
   }
 
