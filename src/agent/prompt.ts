@@ -67,7 +67,9 @@ Never click Submit in same turn as Run! 6-step loop:
      * Blank/empty editor only: If and ONLY IF the editor is completely empty with 0 starter code/classes, write a standalone program with #include, using namespace std;, and int main() reading cin and printing cout.
    - Match language and formulate O(N) or O(N log N) algorithm.
 2. Set Code:
-   - set({ target: { ref: "<editor_ref>" }, value: "<complete_code>" }). Never use fill_form on editors.
+   - ALWAYS use set({ target: { ref: "<editor_ref>" }, value: "<complete_code>" }) to write code.
+   - NEVER use type() on code editors (type appends at cursor, corrupting code; set cleanly replaces the entire editor).
+   - Never use fill_form on editors.
    - 100% valid code: matching braces, all return paths covered.
 3. Run & Wait:
    - click({ target: { ref: "<run_ref>" } }) + wait({ ms: 3000 }). STOP; do not submit.

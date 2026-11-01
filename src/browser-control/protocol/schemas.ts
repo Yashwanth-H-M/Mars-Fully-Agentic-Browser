@@ -45,7 +45,7 @@ const readCommon = {
   tabId: z.number().int().optional().describe("Default: the session's active tab"),
   intent: z
     .string()
-    .max(500)
+    .max(5_000)
     .optional()
     .describe('Human-readable purpose, shown to the user and kept in the audit log'),
   // Positive: Puppeteer reads a navigation timeout of 0 as no deadline at all.
@@ -99,12 +99,24 @@ export const ClickArgsSchema = z.strictObject({
   modifiers: z.array(z.enum(['Alt', 'Control', 'Meta', 'Shift'])).optional(),
 });
 
-export const SetArgsSchema = z.strictObject({
-  ...actionCommon,
-  target: TargetSchema,
-  value: z.union([z.string(), z.boolean(), z.array(z.string())]),
-  submit: z.boolean().optional().describe('Press Enter after setting the value'),
-});
+export const SetArgsSchema = z.preprocess(
+  arg => {
+    if (arg && typeof arg === 'object') {
+      const a = arg as Record<string, unknown>;
+      if (a.value === undefined && typeof a.text === 'string') {
+        const { text, ...rest } = a;
+        return { ...rest, value: text };
+      }
+    }
+    return arg;
+  },
+  z.strictObject({
+    ...actionCommon,
+    target: TargetSchema,
+    value: z.union([z.string(), z.boolean(), z.array(z.string())]),
+    submit: z.boolean().optional().describe('Press Enter after setting the value'),
+  }),
+);
 
 export const FillFormArgsSchema = z.strictObject({
   ...actionCommon,
@@ -114,12 +126,24 @@ export const FillFormArgsSchema = z.strictObject({
   submit: TargetSchema.optional().describe('Activate this element after every field is set'),
 });
 
-export const TypeArgsSchema = z.strictObject({
-  ...actionCommon,
-  text: z.string(),
-  target: TargetSchema.optional(),
-  submit: z.boolean().optional(),
-});
+export const TypeArgsSchema = z.preprocess(
+  arg => {
+    if (arg && typeof arg === 'object') {
+      const a = arg as Record<string, unknown>;
+      if (a.text === undefined && typeof a.value === 'string') {
+        const { value, ...rest } = a;
+        return { ...rest, text: value };
+      }
+    }
+    return arg;
+  },
+  z.strictObject({
+    ...actionCommon,
+    text: z.string(),
+    target: TargetSchema.optional(),
+    submit: z.boolean().optional(),
+  }),
+);
 
 export const PressArgsSchema = z.strictObject({
   ...actionCommon,

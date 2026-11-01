@@ -329,6 +329,50 @@ async function setText(
       null,
       async keys => {
         await probe.call(target.frame, target.objectId, 'selectContents');
+        const isEditor = await ctx
+          .tab()
+          .probe?.call<boolean>(target.frame, target.objectId, 'isEditor')
+          .catch(() => false);
+        if (isEditor) {
+          for (const mod of [2, 4]) {
+            await cdp
+              .send(undefined, 'Input.dispatchKeyEvent', {
+                type: 'rawKeyDown',
+                key: 'a',
+                code: 'KeyA',
+                windowsVirtualKeyCode: 65,
+                modifiers: mod,
+                commands: ['selectAll'],
+              })
+              .catch(() => undefined);
+            await cdp
+              .send(undefined, 'Input.dispatchKeyEvent', {
+                type: 'keyUp',
+                key: 'a',
+                code: 'KeyA',
+                windowsVirtualKeyCode: 65,
+                modifiers: mod,
+              })
+              .catch(() => undefined);
+          }
+          await cdp
+            .send(undefined, 'Input.dispatchKeyEvent', {
+              type: 'rawKeyDown',
+              key: 'Backspace',
+              code: 'Backspace',
+              windowsVirtualKeyCode: 8,
+              commands: ['deleteContentBackward'],
+            })
+            .catch(() => undefined);
+          await cdp
+            .send(undefined, 'Input.dispatchKeyEvent', {
+              type: 'keyUp',
+              key: 'Backspace',
+              code: 'Backspace',
+              windowsVirtualKeyCode: 8,
+            })
+            .catch(() => undefined);
+        }
         ctx.tab().actionSeq++;
         const dialog = await keys.unit(async () => {
           if (value === '') {
@@ -914,6 +958,44 @@ export async function type(ctx: ToolContext, args: TypeArgs): Promise<ToolOutcom
                 .tab()
                 .probe?.call(target.frame, target.objectId, 'selectContents')
                 .catch(() => false);
+              for (const mod of [2, 4]) {
+                await cdp
+                  .send(undefined, 'Input.dispatchKeyEvent', {
+                    type: 'rawKeyDown',
+                    key: 'a',
+                    code: 'KeyA',
+                    windowsVirtualKeyCode: 65,
+                    modifiers: mod,
+                    commands: ['selectAll'],
+                  })
+                  .catch(() => undefined);
+                await cdp
+                  .send(undefined, 'Input.dispatchKeyEvent', {
+                    type: 'keyUp',
+                    key: 'a',
+                    code: 'KeyA',
+                    windowsVirtualKeyCode: 65,
+                    modifiers: mod,
+                  })
+                  .catch(() => undefined);
+              }
+              await cdp
+                .send(undefined, 'Input.dispatchKeyEvent', {
+                  type: 'rawKeyDown',
+                  key: 'Backspace',
+                  code: 'Backspace',
+                  windowsVirtualKeyCode: 8,
+                  commands: ['deleteContentBackward'],
+                })
+                .catch(() => undefined);
+              await cdp
+                .send(undefined, 'Input.dispatchKeyEvent', {
+                  type: 'keyUp',
+                  key: 'Backspace',
+                  code: 'Backspace',
+                  windowsVirtualKeyCode: 8,
+                })
+                .catch(() => undefined);
             }
           }
           const dialog = await keys.unit(async () => {
