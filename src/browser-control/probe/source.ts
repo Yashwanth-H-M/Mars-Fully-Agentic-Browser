@@ -1156,7 +1156,18 @@ export function probeMain(): void {
         if (el.matches(INTERACTIVE)) break;
       }
       for (let n: Node | null = target; n; n = composedParent(n)) {
-        if (n === hit) return { accepted: false, kind: 'ancestor' as const };
+        if (n === hit) {
+          // If the hit element is an ancestor container (like a clickable card, row, button, or link containing the target),
+          // clicking this point activates the container or bubbles to it. Accept it as a valid container hit!
+          if (
+            hit.nodeType === 1 &&
+            hit !== (hit.ownerDocument || document).body &&
+            hit !== (hit.ownerDocument || document).documentElement
+          ) {
+            return { accepted: true, kind: 'inside' as const };
+          }
+          return { accepted: false, kind: 'ancestor' as const };
+        }
       }
       return { accepted: false, kind: 'other' as const };
     },
@@ -1179,7 +1190,8 @@ export function probeMain(): void {
         (hit !== null && target.contains(hit)) ||
         (hit !== null &&
           hit.contains(target) &&
-          (target.tagName === 'TEXTAREA' || target.tagName === 'INPUT' || (target as HTMLElement).isContentEditable)) ||
+          hit !== (hit.ownerDocument || document).body &&
+          hit !== (hit.ownerDocument || document).documentElement) ||
         (hit !== null &&
           targetContainer !== null &&
           (targetContainer === editorContainerOf(hit) || targetContainer.contains(hit))) ||
