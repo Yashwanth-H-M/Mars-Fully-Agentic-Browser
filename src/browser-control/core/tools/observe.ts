@@ -176,7 +176,10 @@ export async function find(ctx: ToolContext, args: FindArgs): Promise<ToolOutcom
   const name = args.name ? cleanQ(args.name) : undefined;
   const text = args.text ? cleanQ(args.text) : undefined;
   const matches = actionableNodes(roots).filter(n => {
-    if (role && n.role.toLowerCase() !== role && n.rawRole.toLowerCase() !== role) return false;
+    if (role && n.role.toLowerCase() !== role && n.rawRole.toLowerCase() !== role) {
+      const isEditorMatch = role === 'textbox' && (n.name?.toLowerCase().includes('editor') || n.role === 'textbox');
+      if (!isEditorMatch) return false;
+    }
     const cleanNName = cleanQ(n.name ?? '');
     const cleanNVal = cleanQ(n.value ?? '');
     const matchName =

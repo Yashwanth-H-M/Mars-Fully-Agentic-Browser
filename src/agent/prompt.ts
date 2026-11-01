@@ -57,7 +57,8 @@ STAGE 2: CODING PLAYGROUND (Left = Description, Center = Code Editor & Toolbar, 
 - TOOLBAR & MODAL REASONING:
   * Icons: "⟲" = Reset to starter code. "{}" = Retrieve submission/templates (NEVER click "{}" to reset!). "≡" = Format.
   * Modals: NEVER blindly confirm! If modal says "Retrieve Last Submission: Replace code with last submitted code?", click Cancel (it overwrites with an OLD question's code!). If it says "Reset to Default", confirm.
-  * Loop Prevention: If an action yields wrong code, DO NOT repeat the same click. Pause and adjust.
+  * Reset Recovery: After confirming "Reset to default", ALWAYS call snapshot({ mode: 'all' }) immediately to get the fresh editor ref! (Closing a modal updates the page revision, making old refs stale).
+  * Stale Ref / REF_NOT_PRESENTED: If an editor ref is stale, call snapshot({ mode: 'all' }) to observe current [ref] textbox "Code Editor". Never loop calling find().
 
 - THE 6-STEP EXECUTION LOOP:
 1. Inspect Starter Code: Call read({ ref: "<editor_ref>", format: "text" }).

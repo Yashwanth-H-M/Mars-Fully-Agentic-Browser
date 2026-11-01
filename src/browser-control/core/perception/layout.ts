@@ -325,6 +325,8 @@ export function layoutRole(node: LayoutNode, signal: string): string {
   if (node.tag === 'select') return 'combobox';
   if (node.tag === 'textarea') return 'textbox';
   if (signal === 'contenteditable') return 'textbox';
+  const cls = node.attrs.class ?? '';
+  if (/(monaco-editor|ace_editor|CodeMirror|cm-editor|code-editor)/i.test(cls)) return 'textbox';
   return 'clickable';
 }
 

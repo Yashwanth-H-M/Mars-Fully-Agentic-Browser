@@ -95,7 +95,13 @@ function findActionableNameOrTooltip(doc: LayoutDocument, node: LayoutNode): str
   const domText = (doc.text(node.index, 60) || doc.digest(node.index, 60)).trim();
   if (domText && domText.length < 60 && !domText.includes('\n')) return domText;
 
-  // 4. Semantic testid or id
+  // 4. Code editor detection
+  const cls = node.attrs.class ?? '';
+  if (/(monaco-editor|ace_editor|CodeMirror|cm-editor|code-editor)/i.test(cls) || 'data-mode-id' in node.attrs) {
+    return 'Code Editor';
+  }
+
+  // 5. Semantic testid or id
   const testId = node.attrs['data-testid'] || node.attrs.id;
   if (testId && /(reset|submit|run|format|copy|clear|setting|fullscreen|theme|retrieve)/i.test(testId)) {
     return testId.replace(/[-_]+/g, ' ');
@@ -234,6 +240,15 @@ export function enrichFrame(
           existing.actionable = true;
         }
       }
+    }
+
+    const cls = node.attrs.class ?? '';
+    const isEditor =
+      /(monaco-editor|ace_editor|CodeMirror|cm-editor|code-editor)/i.test(cls) || 'data-mode-id' in node.attrs;
+    if (isEditor && existing) {
+      existing.role = 'textbox';
+      existing.actionable = true;
+      if (!existing.name) existing.name = 'Code Editor';
     }
 
     if (existing?.actionable) {
