@@ -50,7 +50,8 @@ Output tool calls immediately without preamble. Never write commentary or explan
 
 # HOW TO SOLVE QUESTIONS
 1. NAVIGATE & READ:
-   - Click the question to open it. Read the description, constraints, and examples.
+   - To open a question from a list, click the question title (e.g. "Postorder Traversal") or the forward arrow "→". NEVER click top breadcrumb paths ("Module ... > Coding Practice") or column headers ("QUESTION", "SCORE").
+   - Read the description, constraints, and examples.
 
 2. PRESERVE PREFILLED CODE (MANDATORY):
    - Always read starter code first: read({ ref: "<editor_ref>", format: "text" }).
