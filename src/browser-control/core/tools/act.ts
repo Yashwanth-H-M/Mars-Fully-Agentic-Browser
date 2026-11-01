@@ -17,6 +17,7 @@ import { checkCancelled } from '../controller';
 import type { DialogInfo } from '../interaction/pointer';
 import { withPageState } from './navigate';
 import { dialogDetail } from '../text';
+import { isForfeitAction } from '../perception/outline';
 
 /** Runs fn with a resolved target and always releases the probe's handle on it. */
 export async function withTarget<T>(
@@ -78,6 +79,13 @@ export async function click(ctx: ToolContext, args: ClickArgs): Promise<ToolOutc
       return { target, actionable };
     };
     const prepared = await prepare(first);
+    const targetName = (first.record.print.name || first.record.print.shown || '').trim();
+    if (isForfeitAction(targetName) || isForfeitAction(first.description || '')) {
+      throw new LayerError(
+        'INVALID_ARGUMENT',
+        `Action refused: "${first.record.print.name || targetName}" is an assessment forfeit button that aborts the quiz. Select an answer choice instead.`,
+      );
+    }
     // One approval is for one activation: a double or triple click on a sensitive target is refused before
     // the user is asked, since the prompt would describe one click.
     if ((args.count ?? 1) > 1 && ctx.session.confirmPolicy !== 'never') {

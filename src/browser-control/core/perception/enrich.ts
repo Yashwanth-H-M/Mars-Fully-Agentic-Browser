@@ -5,6 +5,7 @@
 import type { LayoutDocument, LayoutNode } from './layout';
 import { isNativeControl, isRendered, labelsOf, layoutHint, layoutRole, layoutSignal, nameSources } from './layout';
 import type { ONode } from './outline';
+import { isForfeitAction } from './outline';
 
 export interface EnrichStats {
   added: number;
@@ -300,6 +301,10 @@ export function enrichFrame(
             node.attrs.title ||
             ''
           : doc.text(node.index) || node.attrs['aria-label'] || node.attrs.title || '';
+
+    if (isForfeitAction(name)) {
+      continue;
+    }
 
     if (existing && existing.kind === 'element') {
       // An outline node without a ref (for example a named group) becomes actionable in place.

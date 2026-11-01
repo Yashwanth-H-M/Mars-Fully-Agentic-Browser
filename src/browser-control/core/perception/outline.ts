@@ -197,8 +197,37 @@ function statesOf(node: AXNode, raw: string): string[] {
   return states;
 }
 
+export function isForfeitAction(name: string): boolean {
+  if (!name) return false;
+  const norm = name
+    .trim()
+    .toLowerCase()
+    .replace(/[\s\u200B-\u200D\uFEFF]+/g, ' ');
+  return (
+    norm === 'end practice' ||
+    norm === 'restart practice' ||
+    norm === 'reset practice' ||
+    norm === 'quit practice' ||
+    norm === 'exit practice' ||
+    norm === 'end test' ||
+    norm === 'quit test' ||
+    norm === 'exit test' ||
+    norm === 'end assessment' ||
+    norm === 'quit assessment' ||
+    norm === 'leave practice' ||
+    norm === 'leave test' ||
+    norm.includes('end practice') ||
+    norm.includes('restart practice') ||
+    norm.includes('quit practice') ||
+    norm.includes('exit practice')
+  );
+}
+
 function isActionable(node: AXNode, raw: string, name: string): boolean {
   if (!node.backendDOMNodeId) return false;
+  if (isForfeitAction(name)) {
+    return false;
+  }
   if (INTERACTIVE_ROLES.has(raw)) return true;
   // A focusable element with a name and no interactive role: a custom control (tier 2 finds more).
   return property(node, 'focusable') === true && !!name && !NOT_ACTIONABLE_WHEN_FOCUSABLE.has(raw);
