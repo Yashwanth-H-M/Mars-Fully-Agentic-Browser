@@ -76,7 +76,17 @@ async function resolveSemantic(
     const nRole = n.role.toLowerCase();
     const nRawRole = n.rawRole.toLowerCase();
     const isControlOrInput = (r: string) =>
-      ['radio', 'checkbox', 'button', 'option', 'clickable', 'menuitemradio', 'menuitemcheckbox', 'link', 'input'].includes(r);
+      [
+        'radio',
+        'checkbox',
+        'button',
+        'option',
+        'clickable',
+        'menuitemradio',
+        'menuitemcheckbox',
+        'link',
+        'input',
+      ].includes(r);
     if (role && role !== 'text' && nRole !== role && nRawRole !== role) {
       if (!(isControlOrInput(role) && (isControlOrInput(nRole) || isControlOrInput(nRawRole)))) {
         return;
@@ -164,9 +174,7 @@ async function resolveSemantic(
     }
     const candidateMatches = nonAncestors.length > 0 ? nonAncestors : matches;
 
-    const radios = candidateMatches.filter(m =>
-      ['radio', 'checkbox', 'menuitemradio'].includes(m.role.toLowerCase()),
-    );
+    const radios = candidateMatches.filter(m => ['radio', 'checkbox', 'menuitemradio'].includes(m.role.toLowerCase()));
     if (radios.length === 1) {
       return asShown(ctx, observation, radios[0].ref!);
     }
@@ -185,9 +193,7 @@ async function resolveSemantic(
     if (exact.length === 1) {
       return asShown(ctx, observation, exact[0].ref!);
     }
-    const exactRadios = exact.filter(m =>
-      ['radio', 'checkbox', 'clickable', 'option'].includes(m.role.toLowerCase()),
-    );
+    const exactRadios = exact.filter(m => ['radio', 'checkbox', 'clickable', 'option'].includes(m.role.toLowerCase()));
     if (exactRadios.length === 1) {
       return asShown(ctx, observation, exactRadios[0].ref!);
     }
@@ -366,7 +372,7 @@ async function resolveByText(ctx: ToolContext, text: string, nth = 0): Promise<R
             try {
               const sel = rawTarget.startsWith('.') || rawTarget.startsWith('#')
                 ? rawTarget
-                : '.' + rawTarget.replace(/[\s.]+/g, '.');
+                : '.' + rawTarget.replace(/[\\s.]+/g, '.');
               const el = document.querySelector(sel);
               if (el) return el;
             } catch {}
@@ -401,7 +407,7 @@ async function resolveByText(ctx: ToolContext, text: string, nth = 0): Promise<R
             }
             if (el.className && typeof el.className === 'string') {
               const cls = el.className.toLowerCase();
-              const normCls = cls.replace(/\s+/g, '.');
+              const normCls = cls.replace(/\\s+/g, '.');
               if (cls.includes(target) || normCls.includes(target) || target.includes(cls) || target.includes(normCls)) {
                 return el;
               }

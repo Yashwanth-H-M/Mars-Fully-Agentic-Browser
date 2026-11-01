@@ -19,36 +19,39 @@
 
 ## ⚡ What is Mars?
 
-**Mars** is a state-of-the-art, fully autonomous AI web browser extension for Chrome and Edge. Working directly in your side panel, Mars observes web pages, plans actions, navigates, types, clicks, fills complex multi-field forms, coordinates tasks across multiple tabs, and extracts data—all with blazing speed and complete deterministic precision.
+**Mars** is a state-of-the-art, fully autonomous AI web browser extension for Chrome and Edge. Operating directly in your browser's side panel, Mars observes live web pages, plans actions, navigates, types, clicks, fills complex forms, coordinates parallel workflows across multiple tabs, solves coding challenges, and completes multi-question assessments—all with blazing speed and deterministic precision.
 
-Unlike traditional slow web agents that take minutes to click through forms, Mars is engineered with a **low-latency deterministic execution engine** that makes web automation feel instantaneous.
+Unlike slow, brittle web automation wrappers that take minutes to click through forms, Mars is engineered with a **low-latency deterministic execution engine** that makes autonomous web interaction feel instantaneous.
 
 ---
 
-## 🚀 Why Mars is the Best & Fastest in the World
+## 🚀 Key Features & Superpowers
 
 ### ⚡ Blazing Speed & Engineered Performance
-* **Sub-50ms Settle Loops:** Replaced traditional multi-second polling with an ultra-responsive 30ms adaptive settle cycle, cutting down action verification from 1,500ms to under 60ms.
+* **Sub-50ms Settle Loops:** Replaced traditional multi-second polling with an ultra-responsive 30ms adaptive settle cycle, cutting action verification from 1,500ms to under 60ms.
 * **Instant Actionability Engine:** Element bounds and coordinate stability are validated with sub-20ms precision, eliminating redundant CDP roundtrips before clicking or typing.
-* **Intelligent Action Batching:** Rather than wasting 5–10 seconds of LLM thinking on every single button press, Mars batches sequential inputs, field fills, and clicks into single-turn executions via native `fill_form` and composite actions.
-* **High-Throughput Perception:** Optimized accessibility tree outline and layout processing that matches the agent's exact consumption budget, reducing DOM serialization overhead by up to **70%**.
-* **Zero-Lag Navigation:** Smart lifecycle detection moves on as soon as document rendering stabilizes, never freezing on persistent background network requests.
+* **Intelligent Action Batching:** Rather than wasting 5–10 seconds of LLM inference on every single button press, Mars batches sequential inputs, field fills, and clicks into single-turn executions with atomic verification.
+* **Proactive Context Elision & Turn Pacing:** Keeps conversation history lean (~10k–14k tokens) by automatically eliding superseded DOM outlines into compact stubs (`[tab X rev Y: page content elided]`). Cuts Tokens-Per-Minute (TPM) usage by **~80%**, allowing Mars to run 20+ questions continuously without hitting API rate limits or 429 backoff stalls.
+* **Zero-Lag Navigation:** Smart lifecycle detection moves forward as soon as document rendering stabilizes, never hanging on background analytics requests.
 
 ### 🧠 True Autonomous Agentic Power
-* **Independent Visual Overlay Cursors:** Real-time visual secondary cursor rendering the agent's exact interactions (clicks, smooth hovers, scroll ripples, action badges). Completely decoupled from your physical mouse/keyboard—you can browse freely without interrupting the agent. Supports multi-cursor visualization for parallel workflows and automatically fades out during vision screenshots so models see a clean page.
-* **Dynamic Prompt Dashboard & Multi-Persona System Prompts:** Quick-switch UI right inside the composer to create, isolate, and switch between customized system prompts (e.g., Coding Practice Assistant, Deep Research, Web Scraping, Form Auto-fill) without touching or polluting the hardcoded core agent instructions.
-* **Flawless Coding Platform Compatibility:** Built-in intelligence for online code editors (LeetCode, HackerRank, CodeChef, NxtWave/SGU). Strictly preserves prefilled method signatures, boilerplate wrappers, and exact casing (`Solution` vs `solution`) without corrupting starter templates.
-* **Multi-Tab Orchestration:** Mars can manage, switch between, and coordinate parallel workflows across dedicated tab groups while you continue browsing undisturbed.
-* **Stable Element Ref Registry:** In-page isolated probes assign stable identifiers (`[e1]`, `[e2]`) based on Chrome's native accessibility tree. If the page shifts or reflows, elements fail-closed rather than mis-clicking.
-* **Verification Debt Tracking:** Mars doesn't just guess that an action worked—it deterministically inspects DOM mutations, URL changes, and HTTP network side-effects to prove that the task succeeded before finishing.
+* **Independent Visual Multi-Cursor Overlay:** Real-time visual secondary cursor rendering the agent's exact interactions (clicks, smooth hovers, scroll ripples, action badges). Completely decoupled from your physical mouse/keyboard—you can browse freely without interrupting the agent.
+* **Dynamic Prompt Dashboard & Isolated Personas:** Quick-switch UI inside the composer to create, customize, and switch between isolated system prompts:
+  * **Default Hybrid:** High-speed autonomous execution for coding platforms and quizzes.
+  * **Master MCQ Specialist:** Dedicated multi-question quiz and assessment solver with strict choice-first validation, automatic submission, and seamless question advancement.
+  * **Master Coding Specialist:** Dedicated to online judges (LeetCode, HackerRank, CodeChef, CCBP/SGU) with starter template preservation and self-healing.
+* **Full Inch-to-Inch Audit Logging:** Export complete, transparent diagnostic logs with one click. Captures raw model reasoning tokens, full system prompts, exact DOM outlines, and tool execution receipts for offline auditing in Notepad.
+* **Stable Element Ref Registry:** In-page isolated probes assign stable identifiers (`[e1]`, `[e2]`) based on Chrome's native accessibility tree. Elements fail-closed if the DOM reflows, preventing mis-clicks.
+* **Verification Debt Tracking:** Deterministically inspects DOM mutations, URL changes, and HTTP network side-effects to prove that an action succeeded before completing a task.
+* **Assessment & Forfeit Safeguards:** Automatically detects and refuses accidental clicks on quiz forfeit buttons (`End Practice`, `Restart Practice`, `Quit Practice`), while safely enabling the final submission button (`END ASSESSMENT`) upon test completion.
 
 ### 🛡️ 100% Private, Local & Secure
 * **Direct-to-Provider:** No middleman servers, no proxy gateways, and no accounts required. All LLM calls travel straight from your browser to your selected AI provider.
 * **Your Keys Stay Yours:** API keys are encrypted in local browser storage and never leave your machine.
 * **Prompt Injection Defenses:** Web content is strictly enclosed within randomized nonce-delimited data boundaries (`<<<page-content>>>`). The agent treats page text purely as untrusted data, never as system instructions.
 * **Autonomous & Flexible Modes:**
-  * **Auto Mode (Default):** Seamlessly and autonomously executes full multi-step workflows, clicks, navigations, searches, and forms end-to-end at maximum speed with zero interruptions.
-  * **Ask Mode:** Optionally switch to Ask mode whenever you want Mars to pause and request your permission before submitting forms or sending messages.
+  * **Auto Mode (Default):** Seamlessly and autonomously executes full multi-step workflows end-to-end at maximum speed with zero interruptions.
+  * **Ask Mode:** Optionally pauses and requests your approval before submitting sensitive forms or sending messages.
 
 ---
 
@@ -58,7 +61,7 @@ Mars connects out of the box to any model provider using the Vercel AI SDK:
 
 | Category | Supported Providers & Models |
 | :--- | :--- |
-| **Cloud APIs** | **Google Gemini** (2.5 Flash, 2.0 Pro, 1.5 Flash), **Anthropic Claude** (3.7 Sonnet, 3.5 Haiku), **OpenAI** (GPT-4o, o1, o3-mini), **OpenRouter**, **xAI Grok**, **DeepSeek**, **Mistral** |
+| **Cloud APIs** | **Google Gemini** (2.5 Flash, 3.1 Flash Lite, 2.0 Pro), **Anthropic Claude** (3.7 Sonnet, 3.5 Haiku), **OpenAI** (GPT-4o, o1, o3-mini), **OpenRouter**, **xAI Grok**, **DeepSeek**, **Mistral** |
 | **Local Models (100% Offline)** | **Ollama**, **LM Studio**, **vLLM**, and **llama.cpp** via standard OpenAI-compatible endpoints |
 | **Vision Models** | Full screenshot and image understanding for visual layout reasoning |
 | **Voice Input** | Native real-time voice transcription using Gemini and OpenAI speech models |
@@ -70,9 +73,9 @@ Mars connects out of the box to any model provider using the Vercel AI SDK:
 ### Option 1: Direct Download (Ready to Use — No Node.js Required)
 
 1. Download the pre-built extension zip:
-   - **[⬇️ Download `mars-0.3.0.zip` (Direct Download)](https://github.com/Yashwanth-H-M/Mars-Fully-Agentic-Browser/raw/main/releases/mars-0.3.0.zip)** (or from [GitHub Releases](https://github.com/Yashwanth-H-M/Mars-Fully-Agentic-Browser/releases)).
+   - **[⬇️ Download `mars-0.3.0.zip`](https://github.com/Yashwanth-H-M/Mars-Fully-Agentic-Browser/raw/main/releases/mars-0.3.0.zip)** (or from [GitHub Releases](https://github.com/Yashwanth-H-M/Mars-Fully-Agentic-Browser/releases)).
 2. Unzip `mars-0.3.0.zip` into a folder on your computer.
-3. Open your browser and go to:
+3. Open your browser and navigate to:
    - **Chrome:** `chrome://extensions`
    - **Edge:** `edge://extensions`
 4. Enable **Developer mode** (toggle in the top-right corner).
@@ -85,7 +88,7 @@ Mars connects out of the box to any model provider using the Vercel AI SDK:
 
 #### 1. Prerequisites
 * **Node.js:** `v24.x` (LTS)
-* **pnpm:** `10.x` or run via `corepack pnpm`
+* **pnpm:** `10.x` (run via `corepack pnpm` if not globally installed)
 * **Browser:** Google Chrome or Microsoft Edge
 
 #### 2. Build the Extension
@@ -95,13 +98,13 @@ git clone https://github.com/Yashwanth-H-M/Mars-Fully-Agentic-Browser.git
 cd Mars-Fully-Agentic-Browser
 
 # Install dependencies
-pnpm install
+corepack pnpm install
 
 # Build the extension into dist/
-pnpm build
+corepack pnpm build
 
 # Or package into a zip:
-pnpm zip
+corepack pnpm zip
 ```
 
 #### 3. Load into Your Browser
@@ -117,7 +120,9 @@ pnpm zip
 
 > *"Search Amazon for noise-cancelling headphones under $100 with at least 4.5 stars, compare the top 3 results, and put their specs in a table."*
 
-> *"Go to Hacker News, summarize the top 5 articles about AI, and save the markdown report to my Downloads folder."*
+> *"Solve this entire 15-question MCQ practice assessment on Binomial Distribution, select each answer, submit, and proceed to the next question."*
+
+> *"Go to LeetCode problem #1, write the optimal two-pointer solution in Python, run sample testcases, fix any syntax issues, and submit."*
 
 > *"Fill out this entire registration form with my details, but stop and let me review before clicking Submit."*
 
@@ -149,7 +154,8 @@ Mars is structured into two clean, decoupled architectural layers:
 │  - Frontier UI: Prompt Dashboard, Glassmorphic Composer, Modes   │
 │  - Independent Visual Multi-Cursor Engine (zero user collision)  │
 │  - One agent loop per conversation with dynamic debt clearing    │
-│  - Context compaction & prefix caching stability                 │
+│  - Proactive context elision & adaptive cloud turn pacing        │
+│  - Deep audit logging with model reasoning & raw outline states  │
 │  - Multi-provider Vercel AI SDK integration                     │
 └─────────────────────────────────┬────────────────────────────────┘
                                   │ Typed Message Protocol
@@ -159,7 +165,7 @@ Mars is structured into two clean, decoupled architectural layers:
 │  - Puppeteer frame & multi-session management                    │
 │  - Stable Ref Registry & in-page isolated probe                  │
 │  - Sub-50ms Actionability & Settle Evidence Engine               │
-│  - Strict Navigation Guards & Boundary Defusers                  │
+│  - Strict Navigation Guards, Boundary Defusers & Forfeit Defense │
 └──────────────────────────────────────────────────────────────────┘
 ```
 

@@ -1,7 +1,14 @@
 // The side panel. A view: it draws the worker's events and sends commands; it holds no state a run depends on, and it
 // never reads the conversation stores.
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore } from 'react';
-import { capabilityOf, DEFAULT_SETTINGS, DEFAULT_PROMPT_PRESETS, keysStorage, providersStorage, settingsStorage } from '@src/store/settings';
+import {
+  capabilityOf,
+  DEFAULT_SETTINGS,
+  DEFAULT_PROMPT_PRESETS,
+  keysStorage,
+  providersStorage,
+  settingsStorage,
+} from '@src/store/settings';
 import type { ProviderConfig, Settings } from '@src/store/settings';
 import type { Entry, LivePair, ModelRef, PermissionMode } from '@src/store/types';
 import { makePair } from '@src/llm/profiles';
@@ -141,7 +148,9 @@ async function generateDetailedNotepadLog(
           const outlinePart = parts.find(p => p.type === 'text' && p.attached?.kind === 'outline');
           if (outlinePart && outlinePart.type === 'text') {
             lines.push('');
-            lines.push(`Attached Page Observation (Initial Snapshot at Run Start) [${outlinePart.attached?.label || 'outline'}]:`);
+            lines.push(
+              `Attached Page Observation (Initial Snapshot at Run Start) [${outlinePart.attached?.label || 'outline'}]:`,
+            );
             lines.push('----------------------------------------------------------------------');
             lines.push(outlinePart.text);
             lines.push('----------------------------------------------------------------------');
@@ -176,7 +185,9 @@ async function generateDetailedNotepadLog(
               const tokIn = m.usage.input ?? 0;
               const tokOut = m.usage.output ?? 0;
               const tokReas = m.usage.reasoning ?? 0;
-              lines.push(`Token Usage: Input: ${tokIn} | Output: ${tokOut} | Reasoning: ${tokReas} | Total: ${tokIn + tokOut} tokens`);
+              lines.push(
+                `Token Usage: Input: ${tokIn} | Output: ${tokOut} | Reasoning: ${tokReas} | Total: ${tokIn + tokOut} tokens`,
+              );
             }
             if (m.stopReason) lines.push(`Stop Reason: ${m.stopReason}`);
             if (m.reasoning) lines.push(`Wire Effort: ${m.reasoning}`);
@@ -253,13 +264,17 @@ async function generateDetailedNotepadLog(
               lines.push(`  CDP Dispatched: ${r.dispatched}`);
               if (r.reachedTarget !== undefined) lines.push(`  Reached Target Element: ${r.reachedTarget}`);
               if (r.effect) {
-                lines.push(`  Page Effect Verdict: ${r.effect.verdict || 'none'} (Signals: ${r.effect.signals?.join(', ') || 'none'})`);
+                lines.push(
+                  `  Page Effect Verdict: ${r.effect.verdict || 'none'} (Signals: ${r.effect.signals?.join(', ') || 'none'})`,
+                );
               }
               if (r.navigation) {
                 lines.push(`  Page Navigation Triggered: [${r.navigation.kind || 'navigation'}] ${r.navigation.url}`);
               }
               if (r.postcondition) {
-                lines.push(`  Post-Condition State: ${r.postcondition.status}${r.postcondition.detail ? ` (${r.postcondition.detail})` : ''}`);
+                lines.push(
+                  `  Post-Condition State: ${r.postcondition.status}${r.postcondition.detail ? ` (${r.postcondition.detail})` : ''}`,
+                );
               }
               if (r.allowedBy) {
                 lines.push(`  Permission Mode / Allowed By: ${r.allowedBy}`);
@@ -272,11 +287,15 @@ async function generateDetailedNotepadLog(
             }
             if (res.page) {
               lines.push('');
-              lines.push(`Page State After Action: "${res.page.title || ''}" [${res.page.url || ''}] (Rev: ${res.page.rev ?? 0}, Changed: ${res.page.changed || 'none'})`);
+              lines.push(
+                `Page State After Action: "${res.page.title || ''}" [${res.page.url || ''}] (Rev: ${res.page.rev ?? 0}, Changed: ${res.page.changed || 'none'})`,
+              );
             }
             if (res.pending && res.pending.length > 0) {
               lines.push('');
-              lines.push(`Modals Opened by Action: ${res.pending.map(m => `[${m.kind || 'modal'}] ${m.detail || ''}`).join(', ')}`);
+              lines.push(
+                `Modals Opened by Action: ${res.pending.map(m => `[${m.kind || 'modal'}] ${m.detail || ''}`).join(', ')}`,
+              );
             }
             lines.push('');
             lines.push('Structured Layer Result / Full Data (Raw JSON):');
@@ -360,7 +379,9 @@ async function generateDetailedNotepadLog(
           lines.push(`Latency: ${entry.durationMs} ms`);
         }
         if (entry.usage) {
-          lines.push(`Token Usage: Input: ${entry.usage.input} | Output: ${entry.usage.output} | Reasoning: ${entry.usage.reasoning ?? 0}`);
+          lines.push(
+            `Token Usage: Input: ${entry.usage.input} | Output: ${entry.usage.output} | Reasoning: ${entry.usage.reasoning ?? 0}`,
+          );
         }
         if (entry.reasoningText) {
           lines.push('');
@@ -374,7 +395,11 @@ async function generateDetailedNotepadLog(
           lines.push('Actions & Tool Calls:');
           for (const tool of entry.tools) {
             const status =
-              tool.status === 'done' ? '[OK - SUCCESS]' : tool.status === 'failed' ? '[FAILED]' : `[${tool.status.toUpperCase()}]`;
+              tool.status === 'done'
+                ? '[OK - SUCCESS]'
+                : tool.status === 'failed'
+                  ? '[FAILED]'
+                  : `[${tool.status.toUpperCase()}]`;
             lines.push(`  ${status} Tool: ${tool.tool} (Call ID: ${tool.toolCallId})`);
             if (tool.args) {
               lines.push(`       Arguments: ${JSON.stringify(tool.args, null, 2).replace(/\n/g, '\n       ')}`);
@@ -402,11 +427,17 @@ async function generateDetailedNotepadLog(
               if (res.receipt) {
                 const r = res.receipt;
                 lines.push(`       Execution Logic & Layer Receipt:`);
-                lines.push(`         Action: ${r.action || 'unknown'} | Mechanism: ${r.mechanism || 'pointer'} | Dispatched: ${r.dispatched}`);
+                lines.push(
+                  `         Action: ${r.action || 'unknown'} | Mechanism: ${r.mechanism || 'pointer'} | Dispatched: ${r.dispatched}`,
+                );
                 if (r.target) lines.push(`         Resolved Target: ${r.target}`);
                 if (r.reachedTarget !== undefined) lines.push(`         Reached Target Element: ${r.reachedTarget}`);
-                if (r.effect) lines.push(`         Page Effect: ${r.effect.verdict || 'none'} (Signals: ${r.effect.signals?.join(', ') || 'none'})`);
-                if (r.navigation) lines.push(`         Page Navigation: [${r.navigation.kind || 'navigation'}] ${r.navigation.url}`);
+                if (r.effect)
+                  lines.push(
+                    `         Page Effect: ${r.effect.verdict || 'none'} (Signals: ${r.effect.signals?.join(', ') || 'none'})`,
+                  );
+                if (r.navigation)
+                  lines.push(`         Page Navigation: [${r.navigation.kind || 'navigation'}] ${r.navigation.url}`);
                 if (r.allowedBy) lines.push(`         Allowed By: ${r.allowedBy}`);
               }
               if (res.error) {

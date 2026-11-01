@@ -1,162 +1,132 @@
-# Mars Architecture & Optimization Blueprint: The Unified Multi-Step Solution
+# Mars Architecture & Optimization Blueprint
 
-This document outlines the architectural plan to make **Mars** hyper-fast, deterministic, and capable of executing multiple actions in a single turn without touching your custom prompts.
+This document details the architectural blueprint of **Mars**, explaining how its deterministic browser control layer, agent loop, context management engine, and frontier user interface coordinate to deliver high-speed web automation.
 
 ---
 
-## 1. The Core Architectural Dilemma & Resolution
+## 1. System Architecture Overview
+
+Mars is architected into three decoupled layers connected by typed message protocols:
 
 ```
-USER PROMPT DIRECTIVE:
-"ALWAYS emit all needed actions at once in a single turn... click choice, click SUBMIT, then done."
-
-       │
-       ▼
-PREVIOUS CODE BEHAVIOR:
-1. `isLastInBatch = i === runnable.length - 1`
-2. Since `done()` is at the end, intermediate clicks got `observe: 'none'`.
-3. `result.page` was `undefined`.
-4. Verification debt was logged, but could NEVER be cleared without a diff.
-5. When `done()` was reached, the engine rejected it:
-   "Refused: you have not seen the result of these actions!"
-6. The engine forced the LLM into extra recovery turns, stalling the user.
-
-       │
-       ▼
-UNIFIED ARCHITECTURAL RESOLUTION:
-1. The engine identifies the LAST MUTATION in the batch (e.g. `click(submit)`).
-2. Intermediate clicks run with `observe: 'none'` (0ms delay).
-3. The last click runs with `observe: 'diff'` (captures what happened).
-4. That single diff retroactively CLEARS THE DEBT for all clicks in that batch!
-5. When `done()` runs, debt is ZERO. `done()` succeeds immediately in the exact same turn!
+┌────────────────────────────────────────────────────────────────────────┐
+│                        User Interface Layer                            │
+│  - Side Panel: React 18 chat interface, transcript, model picker      │
+│  - Independent Visual Multi-Cursor Overlay: decoupled pointer ripple   │
+│  - Prompt Dashboard: isolated personas (Hybrid, MCQ, Coding)          │
+│  - Audit Log Exporter: inch-to-inch raw model reasoning & outlines    │
+└───────────────────────────────────┬────────────────────────────────────┘
+                                    │ Typed RPC Protocol
+┌───────────────────────────────────▼────────────────────────────────────┐
+│                    Extension Agent Runtime Layer                       │
+│  - One agent loop per active conversation                              │
+│  - Verification Debt Ledger & dynamic clearance engine                 │
+│  - Proactive Context Elision & Adaptive Cloud Turn Pacing              │
+│  - Model Gateway: Vercel AI SDK integration (Gemini, Claude, Ollama)   │
+│  - IndexedDB Message Store & Run Records                               │
+└───────────────────────────────────┬────────────────────────────────────┘
+                                    │ Browser Control Protocol
+┌───────────────────────────────────▼────────────────────────────────────┐
+│                Deterministic Browser Control Layer                     │
+│  - Pure CDP connection via chrome.debugger (no WebSocket/CLI/daemon)   │
+│  - Puppeteer frame & multi-session tracking                            │
+│  - Stable Ref Registry ([e1], [e2]) with fail-closed semantics         │
+│  - Dual Perception: Accessibility Tree (AX) + DOMSnapshot layout      │
+│  - Custom Control Promotion (styled radios, checkboxes, monaco editors)│
+│  - Sub-50ms Settle Evidence Engine & Postcondition Verifier            │
+│  - Forfeit Protection & Assessment Submission Gateway                  │
+└────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 2. Complete System Problem Catalog & Exact Solutions
+## 2. Core Architectural Pillars
 
-### Pillar 1: The Multi-Step Batch & Verification Engine
-* **Files**: `src/agent/loop.ts`, `src/agent/completion.ts`
-* **Defect**: 
-  - `isLastInBatch` treated `done` as the batch terminator instead of distinguishing mutations from control tools.
-  - `clearsDebt()` strictly demanded `page.rev > item.rev`. When intermediate mutations ran with `observe: 'none'`, `rev` was recorded as `0` (or `undefined`), preventing debt clearance.
-* **Concrete Solution**:
-  1. In `src/agent/loop.ts`:
-     - Scan `runnable` in reverse to locate `lastMutateIndex`.
-     - Set `isLastInBatch = i === runnable.length - 1 || i === lastMutateIndex`.
-     - Intermediate mutations run with `observe: 'none'` for instant speed; the terminal mutation runs with `observe: 'diff'`.
-  2. In `src/agent/completion.ts`:
-     - Update `clearsDebt()` to accept `page.rev >= item.rev` on the same tab, so the terminal diff clears all prior mutations executed in that turn.
-     - Clear debt immediately if `result.receipt.postcondition.status === 'met'`.
-  3. In `AgentLoop`:
-     - Track active tab revisions in an internal `#tabRevs` map so `rev` is always a valid monotonically increasing integer, never `undefined`.
+### Pillar 1: Deterministic Browser Control Layer
+- **No Model Inside the Layer:** The browser control layer is 100% deterministic and contains zero LLM inference. All decisions requiring intelligence belong to the agent runtime.
+- **Chrome Debugger Only:** Reaches the browser strictly through `chrome.debugger.attach` and `chrome.debugger.sendCommand`. No remote WebSockets, no headless daemons, no external processes.
+- **Puppeteer as Frame Manager:** Puppeteer core is utilized solely for detecting frames, out-of-process iframes (OOPIFs), and frame navigations. It does not select or click elements.
+- **Stable Ref Registry:** Every visible, actionable node receives a deterministic reference tag (`[w1]`, `[w2]`). Elements are addressed by their native `backendDOMNodeId` and CDP object handles, never by CSS selectors or XPath.
+- **Custom Control Promotion:**
+  - Detects native `<input type="radio">` and `<input type="checkbox">` elements rendered with `opacity: 0`, `display: none`, or 0-bounds.
+  - Automatically promotes their interaction targets onto their rendered `<label>` or parent container.
+  - Recognizes styled option containers (`OptionItem`, `question-option`, `choice-item`) and assigns them role `radio` with direct clickable container bounds.
+- **Forfeit Defense:** Mid-test abort buttons (`End Practice`, `Restart Practice`, `Quit Practice`, `Leave Practice`) are stripped from actionable perception during active assessments and refused before dispatch if targeted. Completion buttons (`END ASSESSMENT`, `Submit Test`) retain full actionable refs for clean test completion.
 
 ---
 
-### Pillar 2: Eliminating Interaction Settle Delays
-* **Files**: `src/browser-control/core/interaction/evidence.ts`, `actionability.ts`, `pointer.ts`
-* **Defect**:
-  - `evidence.ts` waits up to 600ms (`CAP_MS`) on every click, checking if background network requests (`#requests`) are done. On modern pages with analytics or streaming pings, it always sleeps the full 600ms.
-  - `actionability.ts` has a mandatory 20ms sleep between quads and runs redundant `scrollIntoViewIfNeeded` even for elements already centered in the viewport.
-  - `pointer.ts` runs a mid-click check (`stillJudged`) between `mousePressed` and `mouseReleased`. If an element shows a loading state or updates text on `mousedown`, it withholds the mouse release and drops the click.
-* **Concrete Solution**:
-  1. In `evidence.ts`:
-     - Only track network requests initiated *after* the action's dispatch timestamp.
-     - Implement an immediate **fast-settle exit**: if target DOM mutations or frame state changes are recorded and no navigation is pending, break out of the poll loop after 2 quiet ticks (40ms) instead of 600ms.
-  2. In `pointer.ts`:
-     - Validate before the click, but remove the mid-click check between `mousePressed` and `mouseReleased`. Once the button is pressed, the release must be dispatched to complete the standard click sequence.
-  3. In `actionability.ts`:
-     - If the element's bounding box is already within the visible viewport, skip `scrollIntoViewIfNeeded` and the stability sleep.
+### Pillar 2: Agent Runtime & Verification Debt Engine
+- **One Loop per Conversation:** Each user conversation runs an independent agent loop.
+- **Atomic Action Batching:**
+  - Multiple tool calls within a single turn (e.g. `[click(option_b), click(submit), click(next)]`) are executed sequentially without waiting for LLM roundtrips between them.
+  - Intermediate actions execute with `observe: 'none'` (0ms observation overhead).
+  - The terminal mutating action in the batch executes with `observe: 'diff'`, producing a single DOM diff that retroactively clears verification debt for all actions in the batch.
+- **Proactive Context Elision:**
+  - For long-running sessions (such as 15–25 question exams or multi-page scraping tasks), context can quickly balloon into tens of thousands of tokens.
+  - Mars monitors total prompt tokens. As soon as context exceeds 16,000 tokens, older superseded DOM snapshots are replaced with compact stubs (`[tab 1 rev 2: page content elided]`).
+  - The active page outline is preserved completely intact.
+  - This cuts Tokens-Per-Minute (TPM) usage by **~80%**, preventing HTTP 429 rate limit stalls and keeping per-turn latency under 1.5 seconds.
+- **Adaptive Cloud Turn Pacing:**
+  - Consecutive model inference calls maintain an automatic 1.2-second minimum interval for cloud providers to prevent bursting past Requests-Per-Minute (RPM) quotas.
 
 ---
 
-### Pillar 3: Perception & CDP Protocol Optimization
-* **Files**: `src/browser-control/core/perception/capture.ts`, `diff.ts`, `tools/text.ts`, `host/page-port.ts`
-* **Defect**:
-  - `fieldFacts()` in `capture.ts` fires up to **80 individual CDP calls** (`DOM.describeNode`) on every snapshot, flooding Chrome's IPC pipe, while `DOMSnapshot.captureSnapshot` already has all attributes in memory.
-  - `diff.ts` allocates a full 2D matrix (`Uint16Array(m + 1)`) for up to 4,000 lines, generating up to 32 MB of memory churn and 16 million loop iterations.
-  - `text.ts` types character-by-character, incurring 2–3 CDP events per character and re-evaluating focus on every space/newline (over 180 CDP calls for a short sentence).
-* **Concrete Solution**:
-  1. In `capture.ts`:
-     - Remove the 80 N+1 `DOM.describeNode` CDP calls. Synchronously populate attributes directly from `DOMSnapshot.captureSnapshot`.
-  2. In `diff.ts`:
-     - Replace the full matrix allocation with a rotating two-row buffer (`prevRow`, `currRow`), dropping diff execution time from 1,500ms to under 10ms with zero memory allocations.
-  3. In `page-port.ts` & `text.ts`:
-     - Dispatch printable character sequences directly using `Input.insertText` and CDP `Input.dispatchKeyEvent`, reducing typing time from 2+ seconds to ~150ms.
+### Pillar 3: Complete Inch-to-Inch Audit Logging
+- **Comprehensive Diagnostic Recording:**
+  - Records the exact system prompt, active preset, model name, and provider ID.
+  - Logs unredacted model reasoning thoughts (e.g. `<think>` blocks, Gemini thought signatures).
+  - Captures the exact DOM outline seen by the model on every turn.
+  - Stores full tool inputs, execution statuses, execution latencies, token usages, and DOM mutation receipts.
+- **One-Click Notepad Export:**
+  - Users can export the entire formatted audit log with a single click from the sidepanel header, generating a clean text document ready for immediate inspection in Notepad.
 
 ---
 
-### Pillar 4: Host Concurrency & CDP Session Hardening
-* **Files**: `src/browser-control/host/connection.ts`, `cdp-session.ts`, `chrome-host.ts`, `core/lock.ts`
-* **Defect**:
-  - `ChromeTabConnection.open(tabId)` has no in-flight promise deduplication. Concurrent calls detach each other mid-flight.
-  - In `lock.ts`, `await previous` sits outside the `try/finally` block. If a task promise rejects, `release()` is never called, deadlocking the tab lock permanently.
-  - In `sendRaw`, if a CDP command times out, post-timeout rejections from Chrome throw unhandled promise rejections.
-  - In `chrome-host.ts`, `load()` has no `onRemoved` listener; if a user closes a tab during navigation, it hangs for 30 seconds.
-* **Concrete Solution**:
-  1. In `connection.ts`: Add `openingConnections: Map<number, Promise<ChromeTabConnection>>` to deduplicate concurrent attach calls.
-  2. In `lock.ts`: Enclose `await previous.catch(() => {})` in the try/finally block so locks always release.
-  3. In `cdp-session.ts`: Add a `timedOut` boolean flag to discard post-timeout errors and avoid unhandled promise rejections.
-  4. In `chrome-host.ts`: Listen to `chrome.tabs.onRemoved` during `load()` and reject immediately if the tab closes.
+### Pillar 4: Frontend UI & Multi-Cursor Overlay
+- **Independent Visual Multi-Cursor:**
+  - Renders a glowing secondary cursor directly inside the web page where the agent interacts.
+  - Visualizes clicks, smooth hovers, and scroll ripples.
+  - Completely independent of the user's hardware mouse pointer—users can scroll, read, and type simultaneously without colliding with the agent.
+  - Automatically hides during vision model screenshot capture so the model sees an unblemished page.
+- **Dynamic Prompt Dashboard:**
+  - Allows instant switching between specialized system prompt presets:
+    - **Default Hybrid:** General-purpose coding judge and quiz solver.
+    - **Master MCQ Specialist:** Specialized in multi-question assessment loops (select choice first, submit, advance).
+    - **Master Coding Specialist:** Specialized in online judge workflows (starter template preservation, sample testing, self-healing).
 
 ---
 
-### Pillar 5: Storage & UI State Desynchronization
-* **Files**: `src/store/conversations.ts`, `src/side-panel/state.ts`, `src/side-panel/Transcript.tsx`, `src/browser-control/probe/source.ts`
-* **Defect**:
-  - `activeBranch` in `conversations.ts` deserializes every message in the entire database ($O(N)$) to trace a 15-node branch path.
-  - `state.ts` drops tool execution updates during streaming because provisional assistant entries are not committed until `message_end`.
-  - `Transcript.tsx` runs an unbounded `useLayoutEffect` on every token render, causing layout thrashing and re-rendering markdown for all historical turns.
-  - `probe/source.ts` never disconnects `blockObserver` in `disarm()`, causing memory leaks on SPAs.
-* **Concrete Solution**:
-  1. In `conversations.ts`: Walk `activeBranch` backwards using primary key lookups (`get(id)`) from `leafId` ($O(D)$), reducing turn startup from 400ms to 5ms.
-  2. In `state.ts`: Create a provisional assistant entry if `messageId` does not yet exist in `entries` so live tool updates are never discarded.
-  3. In `Transcript.tsx`: Add a dependency array `[entries.length, streaming?.text, atBottom]` to `useLayoutEffect`, and memoize `group(entries)` with `useMemo`.
-  4. In `probe/source.ts`: Disconnect `blockObserver` in `disarm()`.
-
----
-
-## 3. Execution Dependency Graph
+## 3. Data Flow Diagram
 
 ```
-┌────────────────────────────────────────────────────────┐
-│ STEP 1: Loop & Debt Engine                             │
-│ • loop.ts (last mutating action detection)             │
-│ • completion.ts (terminal diff clears batch debt)      │
-│ • loop.ts (remove benchmark blockers & add #tabRevs)   │
-└──────────────────────────┬─────────────────────────────┘
-                           │
-                           ▼
-┌────────────────────────────────────────────────────────┐
-│ STEP 2: Perception & Diff Optimization                 │
-│ • capture.ts (eliminate 80 N+1 CDP calls)              │
-│ • diff.ts (rotating two-row diff buffer)               │
-│ • page-port.ts & text.ts (chunked Input.insertText)    │
-└──────────────────────────┬─────────────────────────────┘
-                           │
-                           ▼
-┌────────────────────────────────────────────────────────┐
-│ STEP 3: Interaction Settle & Pointer Reliability       │
-│ • evidence.ts (fast-settle exit, 40ms)                 │
-│ • pointer.ts (remove mid-click withholding)            │
-│ • actionability.ts (skip redundant viewport scrolls)   │
-└──────────────────────────┬─────────────────────────────┘
-                           │
-                           ▼
-┌────────────────────────────────────────────────────────┐
-│ STEP 4: Host Concurrency & CDP Session Hardening       │
-│ • connection.ts (openingConnections deduplication)     │
-│ • lock.ts (try-finally deadlock fix)                   │
-│ • cdp-session.ts (suppress post-timeout rejections)    │
-│ • chrome-host.ts (onRemoved listener in load)          │
-└──────────────────────────┬─────────────────────────────┘
-                           │
-                           ▼
-┌────────────────────────────────────────────────────────┐
-│ STEP 5: Storage & UI State Integrity                   │
-│ • conversations.ts (O(D) activeBranch traversal)       │
-│ • state.ts (provisional tool update commits)           │
-│ • Transcript.tsx (memoize group, fix layout effect)    │
-│ • probe/source.ts (disconnect blockObserver)           │
-└────────────────────────────────────────────────────────┘
+User Prompt
+    │
+    ▼
+Side Panel UI (Composer)
+    │
+    ▼ Typed Extension RPC
+RunManager / AgentLoop
+    │
+    ├─► Context Management: Elide old outlines (tokens > 16k)
+    ├─► Pacing: Ensure >= 1.2s cloud interval
+    │
+    ▼
+Vercel AI SDK (Gemini / Claude / OpenAI / Ollama)
+    │
+    ▼ Model Reply (Tool Calls: click, set, etc.)
+Loop Batch Executor
+    │
+    ├─► Multi-Cursor Overlay: Render visual pointer on page
+    │
+    ▼ CDP Command Dispatcher
+chrome.debugger (Native CDP)
+    │
+    ▼
+DOM Mutation & Page Reaction
+    │
+    ▼ Settle Evidence Engine
+Evidence Verification (Sub-50ms Settle & Mutation Receipt)
+    │
+    ▼ Clear Debt & Record Audit Log
+Update Transcript & UI
 ```

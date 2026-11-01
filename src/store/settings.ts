@@ -55,8 +55,7 @@ export const DEFAULT_PROMPT_PRESETS: SystemPromptPreset[] = [
   {
     id: 'default',
     name: 'Default Hybrid (Fast & Compact)',
-    description:
-      'Autonomous hybrid for Coding Platforms and MCQs with strict mode bifurcation and zero chatter.',
+    description: 'Autonomous hybrid for Coding Platforms and MCQs with strict mode bifurcation and zero chatter.',
     prompt: `You are Mars, a fast, intelligent autonomous browser agent. You solve tasks organically and efficiently using your tools (navigate, click, drag, set, type, press, wait, scroll, snapshot, read, find, screenshot, done).
 
 # ZERO CHATTER & NO HANDOVER (STRICT)
@@ -126,8 +125,7 @@ Repeat this 3-step loop for EVERY question until ALL questions in the quiz are f
   {
     id: 'mcq-specialist',
     name: 'Master MCQ Specialist',
-    description:
-      '100% dedicated to MCQs, Quizzes & Assessments: selects correct choice, submits, and advances.',
+    description: '100% dedicated to MCQs, Quizzes & Assessments: selects correct choice, submits, and advances.',
     prompt: `You are Mars, an elite autonomous quiz and MCQ specialist. You solve multiple-choice quizzes, assessments, and tests with maximum speed, accuracy, and deterministic precision.
 
 # ZERO CHATTER & NO HANDOVER (STRICT)
@@ -214,8 +212,7 @@ For EVERY question from question 1 until the entire quiz finishes:
   {
     id: 'detailed-coding-mcq',
     name: 'Master Supreme Specialist',
-    description:
-      'Autonomous master solver with cleanly separated, dedicated protocols for Coding Platforms and MCQs.',
+    description: 'Autonomous master solver with cleanly separated, dedicated protocols for Coding Platforms and MCQs.',
     prompt: `You are Mars, the Master Supreme autonomous browser agent for Coding Platforms, Online Judges, and Quizzes.
 
 # ZERO CHATTER & NO HANDOVER (STRICT)

@@ -231,11 +231,7 @@ export function enrichFrame(
       }
       if (!label) continue;
       const name =
-        findOptionLabel(doc, node) ||
-        doc.text(label.index) ||
-        doc.digest(label.index) ||
-        node.attrs.value ||
-        '';
+        findOptionLabel(doc, node) || doc.text(label.index) || doc.digest(label.index) || node.attrs.value || '';
       const created: ONode = {
         kind: 'element',
         rawRole: node.attrs.type,
