@@ -138,7 +138,8 @@ export class RefRegistry {
   }
 
   get(ref: string): RefRecord | undefined {
-    return this.#byRef.get(ref);
+    const clean = ref.replace(/^\[+|\]+$/g, '').trim();
+    return this.#byRef.get(clean) ?? this.#byRef.get(ref);
   }
 
   /** The live ref of a node in a document, if it has one. */
@@ -251,7 +252,8 @@ export class KnownSet {
 
   /** What the session was last shown for a ref. */
   shown(tabId: number, ref: string): Shown | undefined {
-    return this.#byTab.get(tabId)?.get(ref);
+    const clean = ref.replace(/^\[+|\]+$/g, '').trim();
+    return this.#byTab.get(tabId)?.get(clean) ?? this.#byTab.get(tabId)?.get(ref);
   }
 
   remove(tabId: number, refs: Iterable<string>): void {
@@ -264,7 +266,8 @@ export class KnownSet {
   }
 
   has(tabId: number, ref: string): boolean {
-    return this.#byTab.get(tabId)?.has(ref) ?? false;
+    const clean = ref.replace(/^\[+|\]+$/g, '').trim();
+    return (this.#byTab.get(tabId)?.has(clean) || this.#byTab.get(tabId)?.has(ref)) ?? false;
   }
 
   size(tabId: number): number {
@@ -284,7 +287,8 @@ const STALE_ERRORS: Record<StaleReason, 'STALE_DOCUMENT' | 'FRAME_DETACHED' | 'D
  * Returns the record as this session was shown it: its source and print are the session's baseline.
  */
 export function lookupRef(registry: RefRegistry, known: KnownSet, ref: string, tabId?: number): RefRecord {
-  const record = registry.get(ref);
+  const clean = ref.replace(/^\[+|\]+$/g, '').trim();
+  const record = registry.get(clean) ?? registry.get(ref);
   if (!record) throw new LayerError('REF_UNKNOWN', `Ref ${ref} is not known`);
   if (tabId !== undefined && tabId !== record.tabId) {
     throw new LayerError('REF_TAB_MISMATCH', `Ref ${ref} belongs to tab ${record.tabId}, not tab ${tabId}`);
@@ -299,9 +303,10 @@ export function lookupRef(registry: RefRegistry, known: KnownSet, ref: string, t
           : 'the debugger detached from its tab';
     throw new LayerError(code, `Ref ${ref} is no longer valid: ${what}`);
   }
-  if (!known.has(record.tabId, ref)) {
+  const effectiveRef = record.ref;
+  if (!known.has(record.tabId, effectiveRef)) {
     throw new LayerError('REF_NOT_PRESENTED', `Ref ${ref} was not in the latest observation of tab ${record.tabId}`);
   }
-  const shown = known.shown(record.tabId, ref);
+  const shown = known.shown(record.tabId, effectiveRef);
   return shown ? { ...record, ...shown } : record;
 }

@@ -2,7 +2,12 @@
 // generate its tool definitions from these schemas.
 import { z } from 'zod';
 
-const ref = z.string().min(1).max(64).describe('A ref from the latest observation, such as "e12"');
+const ref = z
+  .string()
+  .min(1)
+  .max(64)
+  .transform(r => r.replace(/^\[+|\]+$/g, '').trim())
+  .describe('A ref from the latest observation, such as "e12"');
 
 export const RefTargetSchema = z.strictObject({ ref });
 export const SemanticTargetSchema = z

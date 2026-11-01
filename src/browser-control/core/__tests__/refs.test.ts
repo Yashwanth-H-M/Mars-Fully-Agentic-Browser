@@ -227,4 +227,13 @@ describe('ref registry (refs fail closed)', () => {
     mine.add(1, shownThen);
     expect(lookupRef(registry, mine, record.ref).print.name).toBe('Preview');
   });
+
+  it('normalizes bracketed refs transparently', () => {
+    const registry = new RefRegistry('e');
+    const known = new KnownSet();
+    const record = registry.assign(key(1, 10), 'ax', print('Submit'));
+    known.replace(1, shownOf(record));
+    expect(lookupRef(registry, known, `[${record.ref}]`).ref).toBe(record.ref);
+    expect(lookupRef(registry, known, `[[${record.ref}]]`).ref).toBe(record.ref);
+  });
 });
