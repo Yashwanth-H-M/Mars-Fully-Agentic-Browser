@@ -121,6 +121,12 @@ export class ChromeTabConnection implements TabAttachment {
         await connection.cdp
           .send(undefined, 'Emulation.setFocusEmulationEnabled', { enabled: true })
           .catch(() => undefined);
+        // Enable Page and Network domains and lifecycle events so evidence and navigate immediately detect networkIdle
+        await connection.cdp.send(undefined, 'Page.enable').catch(() => undefined);
+        await connection.cdp
+          .send(undefined, 'Page.setLifecycleEventsEnabled', { enabled: true })
+          .catch(() => undefined);
+        await connection.cdp.send(undefined, 'Network.enable').catch(() => undefined);
         return connection;
       } finally {
         ChromeTabConnection.openingConnections.delete(tabId);

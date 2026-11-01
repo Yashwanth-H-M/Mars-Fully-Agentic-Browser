@@ -29,7 +29,7 @@ export interface BorderPorts {
 }
 
 /** How long a screenshot waits for the border to fade out; past it, the capture goes ahead. */
-export const HIDE_WAIT_MS = 50;
+export const HIDE_WAIT_MS = 170;
 
 export class PageBorder {
   /** Conversations whose run is working now. */

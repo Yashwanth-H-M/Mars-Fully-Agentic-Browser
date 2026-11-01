@@ -231,6 +231,18 @@ export function Composer({
   const input = useRef<HTMLTextAreaElement>(null);
   const picker = useRef<HTMLInputElement>(null);
   const [menu, setMenu] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!menu) return;
+    const outside = (e: PointerEvent) => {
+      if (!menuRef.current?.contains(e.target as Node)) {
+        setMenu(false);
+      }
+    };
+    window.addEventListener('pointerdown', outside);
+    return () => window.removeEventListener('pointerdown', outside);
+  }, [menu]);
   const [voice, setVoice] = useState<VoicePhase>('idle');
   const [voiceNotice, setVoiceNotice] = useState<{
     title: MessageKey;
@@ -533,7 +545,7 @@ export function Composer({
         <div className="flex items-center gap-1.5 px-2 pb-2 max-[279px]:gap-1">
           {onAttach ? (
             <>
-              <div className="relative shrink-0">
+              <div ref={menuRef} className="relative shrink-0">
                 <button
                   type="button"
                   aria-label={t('composer.add')}

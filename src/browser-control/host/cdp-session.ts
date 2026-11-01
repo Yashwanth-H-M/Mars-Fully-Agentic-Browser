@@ -68,8 +68,10 @@ export async function sendRaw<T = unknown>(
         if (/not attached|Detached while handling command|No tab with given id/i.test(message)) {
           throw new LayerError('DEBUGGER_DETACHED', `${method}: ${message}`, { delivered: 'unknown' });
         }
-        if (debuggerSessionId && /Session with given id not found/i.test(message)) {
-          throw new LayerError('FRAME_DETACHED', `${method}: frame session is gone (${message})`, { delivered: 'unknown' });
+        if (/Session with given id not found/i.test(message)) {
+          throw new LayerError('FRAME_DETACHED', `${method}: frame session is gone (${message})`, {
+            delivered: 'unknown',
+          });
         }
         throw new CdpCommandError(method, message);
       });

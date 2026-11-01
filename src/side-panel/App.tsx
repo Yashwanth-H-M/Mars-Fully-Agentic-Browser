@@ -192,15 +192,21 @@ export function App() {
   // Selections arrive from the context menu as quote chips for the next message.
   const [quotes, setQuotes] = useState<Array<{ text: string; url: string; title: string }>>([]);
   const quotesTaken = useRef(0);
+  // A screenshot of the tab arrives from the worker as a file for the next message.
+  const taken = useRef(0);
+
   useEffect(() => {
-    const fresh = state.selections.slice(quotesTaken.current);
+    taken.current = 0;
+    quotesTaken.current = 0;
+  }, [state.conversationId]);
+
+  useEffect(() => {
+    const fresh = state.selections.slice(Math.min(quotesTaken.current, state.selections.length));
     quotesTaken.current = state.selections.length;
     if (fresh.length) setQuotes(current => [...current, ...fresh]);
   }, [state.selections]);
-  // A screenshot of the tab arrives from the worker as a file for the next message.
-  const taken = useRef(0);
   useEffect(() => {
-    const fresh = state.attached.slice(taken.current);
+    const fresh = state.attached.slice(Math.min(taken.current, state.attached.length));
     taken.current = state.attached.length;
     // Never past the cap, even when a screenshot arrives after other files filled the message.
     if (fresh.length) setFiles(current => [...current, ...fresh].slice(0, MAX_FILES));

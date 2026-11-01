@@ -3,7 +3,7 @@
 import { AgentLoop, REASONING_DROPPED, STOPPED_BY_USER, STOPPED_NOTE } from '@src/agent/loop';
 import type { LoopEnd } from '@src/agent/loop';
 import type { HostPort } from '@src/agent/ports';
-import type { Session, UserStepDetails } from '@src/browser-control';
+import type { Result, ScreenshotData, Session, UserStepDetails } from '@src/browser-control';
 import { agentSystemPrompt } from '@src/agent/prompt';
 import { toolsForRun } from '@src/agent/tools';
 import { toDisplay } from '@src/agent/display';
@@ -86,10 +86,7 @@ interface ActiveRun {
 function resolveSystemPrompt(settings: typeof DEFAULT_SETTINGS, tools: ReturnType<typeof toolsForRun>): string {
   const presets = settings.customPrompts?.length ? settings.customPrompts : DEFAULT_SETTINGS.customPrompts;
   const activePreset = presets.find(p => p.id === (settings.activePromptId || 'default'));
-  const promptOverride =
-    activePreset && activePreset.id !== 'default' && activePreset.prompt?.trim()
-      ? activePreset.prompt.trim()
-      : undefined;
+  const promptOverride = activePreset?.prompt?.trim() || undefined;
 
   return agentSystemPrompt({
     promptOverride,
@@ -1099,7 +1096,13 @@ export class RunManager {
   async #screenshotTab(connection: PanelConnection, tabId: number, conversationId: string | null): Promise<void> {
     const say = (message: string) => this.journal.direct(conversationId, connection.sink, { type: 'error', message });
     const owner = await this.scope.conversationOf(tabId);
-    if ((owner && this.#runs.has(owner)) || (conversationId && this.#runs.has(conversationId))) {
+    const isRunActive = (convId: string | null): boolean => {
+      if (!convId || !this.#runs.has(convId)) return false;
+      const record = this.#records.get(convId);
+      const isWaiting = record?.status === 'awaiting_user' || this.broker.promptsOf(convId).length > 0;
+      return !isWaiting;
+    };
+    if (isRunActive(owner) || isRunActive(conversationId)) {
       return say('The agent is working in this tab. Stop it first, or wait until it finishes.');
     }
     const controller = await controllerReady;
@@ -1107,17 +1110,24 @@ export class RunManager {
     const session = createAgentSession(controller, {
       urlPolicy: { allow: [], deny: [], blocked: this.permissions.blockedSites() },
     });
-    let result;
+    let result: Result<ScreenshotData> | { ok: false; text: string; error?: { code?: string; message?: string } };
     try {
       session.shareTab(tabId);
-      result = await session.call('screenshot', { tabId });
+      result = (await session.call('screenshot', { tabId })) as Result<ScreenshotData>;
     } catch (error) {
-      result = { ok: false, text: String((error as Error)?.message ?? error) };
+      const code = (error as { code?: string })?.code;
+      const message = (error as Error)?.message ?? String(error);
+      result = { ok: false, text: message, error: { code, message } };
     } finally {
       await controller.closeSession(session);
     }
     const data = result.ok ? (result as { data?: { base64?: string; mimeType?: string } }).data : undefined;
-    if (!data?.base64) return say('This tab cannot be captured: Chrome does not let extensions capture its own pages.');
+    if (!data?.base64) {
+      if (result.error?.code === 'PAGE_NOT_SUPPORTED') {
+        return say('This tab cannot be captured: Chrome does not let extensions capture its own pages.');
+      }
+      return say(result.error?.message || result.text || 'Screenshot capture failed.');
+    }
     const mimeType = data.mimeType ?? 'image/png';
     const bytes = Uint8Array.from(atob(data.base64), c => c.charCodeAt(0));
     const stamp = new Date().toISOString().replace(/[:T]/g, '-').slice(0, 19);

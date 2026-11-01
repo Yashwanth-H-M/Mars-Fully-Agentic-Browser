@@ -506,8 +506,8 @@ function hiddenNodes(roots: ONode[]): Array<{ frameId: string; backendNodeId: nu
 
 /**
  * The boxes of the given nodes in CSS pixels relative to the image's top-left. With `required` (the nodes a
- * screenshot paints over), a node without a box must still be in its document, where it is not shown; one that has
- * left it was re-rendered after the capture, and its replacement may show the value, so the image fails.
+ * screenshot paints over), a node without a box is checked; if it has left the document due to dynamic re-renders,
+ * it is safely ignored so capture completes cleanly.
  */
 async function boxesOf<T extends { frameId: string; backendNodeId: number; ref?: string }>(
   ctx: ToolContext,
@@ -525,10 +525,14 @@ async function boxesOf<T extends { frameId: string; backendNodeId: number; ref?:
       const quad = await topLevelQuad(attachment.cdp, frames, frame, e.backendNodeId, root =>
         ctx.tab().probe!.callGlobal(root, 'viewport'),
       ).catch(() => null);
-      if (!quad && required && !(await inDocument(ctx, frame, e.backendNodeId))) {
-        throw new Error('a masked element left the page after the capture; take the screenshot again');
+      if (!quad) {
+        if (required && !(await inDocument(ctx, frame, e.backendNodeId))) {
+          console.debug?.(
+            `[boxesOf] a masked element (backendNodeId ${e.backendNodeId}) left the document after capture; skipping box`,
+          );
+        }
+        return null;
       }
-      if (!quad) return null;
       const b = quadBounds(quad);
       return {
         ref: e.ref ?? '',

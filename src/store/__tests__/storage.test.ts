@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createStorage } from '../storage';
-import { mergeSettings, DEFAULT_SETTINGS } from '../settings';
+import { mergeSettings, DEFAULT_SETTINGS, DEFAULT_PROMPT_PRESETS } from '../settings';
 
 function fakeChromeStorage() {
   const data: Record<string, unknown> = {};
@@ -37,6 +37,41 @@ describe('createStorage', () => {
     expect(mergeSettings(undefined)).toEqual(DEFAULT_SETTINGS);
     expect(mergeSettings({ turnCap: 7 }).turnCap).toBe(7);
     expect(mergeSettings({ turnCap: 7 }).defaultMode).toBe('auto');
+  });
+
+  it('has 5 built-in presets with non-empty prompts in DEFAULT_PROMPT_PRESETS', () => {
+    expect(DEFAULT_PROMPT_PRESETS).toHaveLength(5);
+    const ids = DEFAULT_PROMPT_PRESETS.map(p => p.id);
+    expect(ids).toEqual(['default', 'mcq-specialist', 'coding-specialist', 'detailed-coding-mcq', 'general-web']);
+    for (const preset of DEFAULT_PROMPT_PRESETS) {
+      expect(preset.prompt.trim().length).toBeGreaterThan(0);
+      expect(preset.isBuiltIn).toBe(true);
+    }
+  });
+
+  it('syncs all 5 built-in presets and preserves custom user presets in mergeSettings', () => {
+    const legacyStored = {
+      customPrompts: [
+        { id: 'default', name: 'Old Default', prompt: '', isBuiltIn: true },
+        { id: 'user-custom-1', name: 'My Own Prompt', prompt: 'custom instructions', isBuiltIn: false },
+      ],
+    };
+    const merged = mergeSettings(legacyStored);
+    expect(merged.customPrompts).toHaveLength(6);
+    const defaultPreset = merged.customPrompts.find(p => p.id === 'default');
+    expect(defaultPreset?.name).toBe('Default Hybrid (Fast & Compact)');
+    expect(defaultPreset?.prompt).toBe(DEFAULT_PROMPT_PRESETS[0].prompt);
+    expect(merged.customPrompts.find(p => p.id === 'coding-specialist')).toBeDefined();
+    expect(merged.customPrompts.find(p => p.id === 'mcq-specialist')).toBeDefined();
+    expect(merged.customPrompts.find(p => p.id === 'detailed-coding-mcq')).toBeDefined();
+    expect(merged.customPrompts.find(p => p.id === 'general-web')).toBeDefined();
+    const userPreset = merged.customPrompts.find(p => p.id === 'user-custom-1');
+    expect(userPreset).toEqual({
+      id: 'user-custom-1',
+      name: 'My Own Prompt',
+      prompt: 'custom instructions',
+      isBuiltIn: false,
+    });
   });
 });
 

@@ -80,6 +80,13 @@ describe('the system prompt', () => {
     expect(agentSystemPrompt({ tools: ['done'], customInstructions: '  \n ' })).not.toContain('custom instructions');
   });
 
+  it('includes screenshot in tool list, disclaimers auto-approved, zero chatter, and no handover in default role', () => {
+    const p = agentSystemPrompt({ tools: ['snapshot', 'done'] });
+    expect(p).toContain('screenshot');
+    expect(p).toContain('ZERO CHATTER & NO HANDOVER (STRICT)');
+    expect(p).toContain('FULL PERMISSION (DISCLAIMERS, MODALS & CONFIRMATIONS)');
+  });
+
   it('gives no agent code a way to change the settings (no tool writes them)', () => {
     const dir = join(import.meta.dirname, '..');
     const sources = readdirSync(dir, { recursive: true, encoding: 'utf8' }).filter(
