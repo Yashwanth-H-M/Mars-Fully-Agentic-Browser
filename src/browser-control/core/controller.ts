@@ -453,14 +453,23 @@ export class Controller {
 export function toProtocolError(error: unknown, readOnly: boolean): ProtocolError {
   if (isLayerError(error)) return error.toProtocol();
   const name = error instanceof Error ? error.name : '';
-  const message = error instanceof Error ? error.message : String(error);
+  const message =
+    error instanceof Error
+      ? error.message
+      : typeof error === 'object' && error !== null
+        ? (error as { message?: string }).message ?? JSON.stringify(error)
+        : String(error);
+  const code = (error as { code?: number })?.code;
   if (name === 'CdpTimeoutError' || name === 'TimeoutError') {
     return new LayerError('TIMEOUT', message, { delivered: readOnly ? false : 'unknown' }).toProtocol();
   }
-  if (/-32001|Session with given id not found/i.test(message)) {
+  if (code === -32001 || /-32001|Session with given id not found/i.test(message)) {
     return new LayerError('FRAME_DETACHED', message, { delivered: readOnly ? false : 'unknown' }).toProtocol();
   }
-  if (/not attached|Detached while handling command|No tab with given id|Target closed/i.test(message)) {
+  if (
+    code === -32000 ||
+    /not attached|Detached while handling command|No tab with given id|Target closed/i.test(message)
+  ) {
     return new LayerError('DEBUGGER_DETACHED', message, { delivered: readOnly ? false : 'unknown' }).toProtocol();
   }
   // An INTERNAL error is a bug in the layer: keep its stack in the worker's console (it holds no page content).

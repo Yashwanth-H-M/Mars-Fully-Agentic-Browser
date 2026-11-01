@@ -87,6 +87,7 @@ export async function enableDomains(cdp: CdpPort, sessionId: SessionId, enabled:
     ) {
       return;
     }
+    if (isLayerError(error)) return;
     throw error;
   }
 }
@@ -249,6 +250,7 @@ export async function captureTier1(
         ) {
           return;
         }
+        if (isLayerError(error)) return;
         throw error;
       }
     }),

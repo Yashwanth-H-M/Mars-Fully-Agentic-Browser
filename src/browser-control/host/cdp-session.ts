@@ -64,11 +64,20 @@ export async function sendRaw<T = unknown>(
       .sendCommand(target, method, params as Record<string, unknown>)
       .catch((error: unknown) => {
         if (timedOut) return undefined as never;
-        const message = error instanceof Error ? error.message : String(error);
-        if (/not attached|Detached while handling command|No tab with given id|Target closed/i.test(message)) {
+        const message =
+          error instanceof Error
+            ? error.message
+            : typeof error === 'object' && error !== null
+              ? (error as { message?: string }).message ?? JSON.stringify(error)
+              : String(error);
+        const code = (error as { code?: number })?.code;
+        if (
+          code === -32000 ||
+          /not attached|Detached while handling command|No tab with given id|Target closed/i.test(message)
+        ) {
           throw new LayerError('DEBUGGER_DETACHED', `${method}: ${message}`, { delivered: 'unknown' });
         }
-        if (/-32001|Session with given id not found/i.test(message)) {
+        if (code === -32001 || /-32001|Session with given id not found/i.test(message)) {
           throw new LayerError('FRAME_DETACHED', `${method}: frame session is gone (${message})`, {
             delivered: 'unknown',
           });
