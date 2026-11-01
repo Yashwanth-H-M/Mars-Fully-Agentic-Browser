@@ -230,13 +230,179 @@ export async function read(
     if (!node) throw new LayerError('NODE_DETACHED', `Ref ${args.ref} is no longer in the page`);
     roots = [node];
     try {
-      const target = await resolveTarget(ctx, { ref: args.ref }).catch(() => null);
-      if (target && tab.probe) {
-        const state = await tab.probe.call<ProbeState>(target.frame, target.objectId, 'state').catch(() => null);
-        if (state?.value && state.value.trim().length > 0) {
-          const isEditor = await tab.probe.call<boolean>(target.frame, target.objectId, 'isEditor').catch(() => false);
-          if (isEditor || state.value.length > 30 || state.value.includes('\n')) {
-            customContent = state.value;
+      // 1. Try reading the full editor text from the main execution context via CDP (bypasses isolated world & DOM virtualization)
+      const attachment = await ctx.attach().catch(() => null);
+      if (attachment) {
+        const frames = await attachment.topology.frames().catch(() => []);
+        const frame = frames.find(f => f.frameId === record.frameId) ?? frames[0];
+        if (frame) {
+          const resolved = await attachment.cdp
+            .send<{ object: { objectId?: string } }>(frame.sessionId, 'DOM.resolveNode', {
+              backendNodeId: record.backendNodeId,
+            })
+            .catch(() => null);
+          if (resolved?.object?.objectId) {
+            const evalRes = await attachment.cdp
+              .send<{ result?: { value?: string } }>(frame.sessionId, 'Runtime.callFunctionOn', {
+                objectId: resolved.object.objectId,
+                functionDeclaration: `function() {
+                  try {
+                    // Monaco: global, models, or editors
+                    const monaco = window.monaco || (window.require && window.require('vs/editor/editor.main'));
+                    if (monaco && monaco.editor) {
+                      if (typeof monaco.editor.getEditors === 'function') {
+                        const eds = monaco.editor.getEditors();
+                        for (const ed of eds) {
+                          const dom = ed.getDomNode?.() || ed.getContainerDomNode?.();
+                          if (dom && (dom === this || this.contains(dom) || dom.contains(this))) {
+                            const val = ed.getValue?.();
+                            if (typeof val === 'string' && val.length > 0) return val;
+                          }
+                        }
+                        if (eds.length > 0) {
+                          const val = eds[0].getValue?.();
+                          if (typeof val === 'string' && val.length > 0) return val;
+                        }
+                      }
+                      if (typeof monaco.editor.getModels === 'function') {
+                        const models = monaco.editor.getModels();
+                        if (models.length > 0) {
+                          const val = models[0].getValue?.();
+                          if (typeof val === 'string' && val.length > 0) return val;
+                        }
+                      }
+                    }
+                  } catch (e) {}
+
+                  // React Fiber: props or hooks
+                  try {
+                    const k = Object.keys(this).find(x => x.startsWith('__reactFiber') || x.startsWith('__reactInternalInstance'));
+                    if (k) {
+                      let curr = this[k];
+                      let d = 0;
+                      while (curr && d < 25) {
+                        const p = curr.memoizedProps;
+                        if (p) {
+                          if (typeof p.value === 'string' && p.value.length > 0) return p.value;
+                          if (typeof p.defaultValue === 'string' && p.defaultValue.length > 0) return p.defaultValue;
+                          if (typeof p.initialValue === 'string' && p.initialValue.length > 0) return p.initialValue;
+                          if (typeof p.code === 'string' && p.code.length > 0) return p.code;
+                        }
+                        let hook = curr.memoizedState;
+                        while (hook) {
+                          const inst = hook.memoizedState?.current || hook.baseState?.current || hook.memoizedState;
+                          if (inst) {
+                            if (typeof inst.getValue === 'function') {
+                              const val = inst.getValue();
+                              if (typeof val === 'string' && val.length > 0) return val;
+                            }
+                            if (typeof inst.getModel === 'function') {
+                              const val = inst.getModel()?.getValue?.();
+                              if (typeof val === 'string' && val.length > 0) return val;
+                            }
+                          }
+                          hook = hook.next;
+                        }
+                        curr = curr.return;
+                        d++;
+                      }
+                    }
+                  } catch (e) {}
+
+                  // Ace editor
+                  try {
+                    const ace = this.env?.editor || (this.closest('.ace_editor') || this.querySelector('.ace_editor'))?.env?.editor || (window.ace && window.ace.edit(this));
+                    if (ace && typeof ace.getValue === 'function') {
+                      const val = ace.getValue();
+                      if (typeof val === 'string' && val.length > 0) return val;
+                    }
+                  } catch (e) {}
+
+                  // CodeMirror 5
+                  try {
+                    const cm = this.CodeMirror || (this.closest('.CodeMirror') || this.querySelector('.CodeMirror'))?.CodeMirror;
+                    if (cm && typeof cm.getValue === 'function') {
+                      const val = cm.getValue();
+                      if (typeof val === 'string' && val.length > 0) return val;
+                    }
+                  } catch (e) {}
+
+                  // CodeMirror 6
+                  try {
+                    const cmView = this.cmView || (this.closest('.cm-editor') || this.querySelector('.cm-editor'))?.cmView;
+                    if (cmView?.view?.state?.doc) {
+                      const val = cmView.view.state.doc.toString();
+                      if (typeof val === 'string' && val.length > 0) return val;
+                    }
+                  } catch (e) {}
+
+                  return null;
+                }`,
+                returnByValue: true,
+              })
+              .catch(() => null);
+
+            await attachment.cdp
+              .send(frame.sessionId, 'Runtime.releaseObject', { objectId: resolved.object.objectId })
+              .catch(() => null);
+
+            if (
+              evalRes?.result?.value &&
+              typeof evalRes.result.value === 'string' &&
+              evalRes.result.value.trim().length > 0
+            ) {
+              customContent = evalRes.result.value;
+            }
+          }
+
+          // Global evaluate fallback in main world if callFunctionOn didn't locate the editor model
+          if (!customContent) {
+            const globalEval = await attachment.cdp
+              .send<{ result?: { value?: string } }>(frame.sessionId, 'Runtime.evaluate', {
+                expression: `(function() {
+                  try {
+                    const m = window.monaco || (window.require && window.require('vs/editor/editor.main'));
+                    if (m && m.editor) {
+                      const eds = m.editor.getEditors ? m.editor.getEditors() : [];
+                      if (eds.length > 0 && typeof eds[0].getValue === 'function') {
+                        const v = eds[0].getValue();
+                        if (v && v.length > 0) return v;
+                      }
+                      const models = m.editor.getModels ? m.editor.getModels() : [];
+                      if (models.length > 0 && typeof models[0].getValue === 'function') {
+                        const v = models[0].getValue();
+                        if (v && v.length > 0) return v;
+                      }
+                    }
+                  } catch (e) {}
+                  return null;
+                })()`,
+                returnByValue: true,
+              })
+              .catch(() => null);
+            if (
+              globalEval?.result?.value &&
+              typeof globalEval.result.value === 'string' &&
+              globalEval.result.value.trim().length > 0
+            ) {
+              customContent = globalEval.result.value;
+            }
+          }
+        }
+      }
+
+      // 2. Fallback to probe state
+      if (!customContent) {
+        const target = await resolveTarget(ctx, { ref: args.ref }).catch(() => null);
+        if (target && tab.probe) {
+          const state = await tab.probe.call<ProbeState>(target.frame, target.objectId, 'state').catch(() => null);
+          if (state?.value && state.value.trim().length > 0) {
+            const isEditor = await tab.probe
+              .call<boolean>(target.frame, target.objectId, 'isEditor')
+              .catch(() => false);
+            if (isEditor || state.value.length > 30 || state.value.includes('\n')) {
+              customContent = state.value;
+            }
           }
         }
       }
