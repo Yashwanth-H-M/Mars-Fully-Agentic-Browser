@@ -65,10 +65,10 @@ export async function sendRaw<T = unknown>(
       .catch((error: unknown) => {
         if (timedOut) return undefined as never;
         const message = error instanceof Error ? error.message : String(error);
-        if (/not attached|Detached while handling command|No tab with given id/i.test(message)) {
+        if (/not attached|Detached while handling command|No tab with given id|Target closed/i.test(message)) {
           throw new LayerError('DEBUGGER_DETACHED', `${method}: ${message}`, { delivered: 'unknown' });
         }
-        if (/Session with given id not found/i.test(message)) {
+        if (/-32001|Session with given id not found/i.test(message)) {
           throw new LayerError('FRAME_DETACHED', `${method}: frame session is gone (${message})`, {
             delivered: 'unknown',
           });

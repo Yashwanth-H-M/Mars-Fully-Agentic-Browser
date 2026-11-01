@@ -457,7 +457,7 @@ export function toProtocolError(error: unknown, readOnly: boolean): ProtocolErro
   if (name === 'CdpTimeoutError' || name === 'TimeoutError') {
     return new LayerError('TIMEOUT', message, { delivered: readOnly ? false : 'unknown' }).toProtocol();
   }
-  if (/Session with given id not found/i.test(message)) {
+  if (/-32001|Session with given id not found/i.test(message)) {
     return new LayerError('FRAME_DETACHED', message, { delivered: readOnly ? false : 'unknown' }).toProtocol();
   }
   if (/not attached|Detached while handling command|No tab with given id|Target closed/i.test(message)) {

@@ -80,7 +80,11 @@ export async function enableDomains(cdp: CdpPort, sessionId: SessionId, enabled:
     await Promise.all([cdp.send(sessionId, 'DOM.enable'), cdp.send(sessionId, 'Accessibility.enable')]);
     enabled.add(key);
   } catch (error) {
-    if (/session.*not found/i.test(String(error)) || (isLayerError(error) && error.code === 'FRAME_DETACHED')) {
+    if (
+      /-32001|session.*not found/i.test(String(error)) ||
+      (isLayerError(error) && (error.code === 'FRAME_DETACHED' || error.code === 'DEBUGGER_DETACHED')) ||
+      sessionId !== undefined
+    ) {
       return;
     }
     throw error;
@@ -207,7 +211,11 @@ async function captureLayout(
           );
           return [sessionId ?? '', snapshot] as const;
         } catch (error) {
-          if (/session.*not found/i.test(String(error)) || (isLayerError(error) && error.code === 'FRAME_DETACHED')) {
+          if (
+            /-32001|session.*not found/i.test(String(error)) ||
+            (isLayerError(error) && error.code === 'FRAME_DETACHED') ||
+            sessionId !== undefined
+          ) {
             return [sessionId ?? '', null] as const;
           }
           throw error;
@@ -234,7 +242,11 @@ export async function captureTier1(
       try {
         await enableDomains(cdp, s, state.enabledSessions);
       } catch (error) {
-        if (/session.*not found/i.test(String(error)) || (isLayerError(error) && error.code === 'FRAME_DETACHED')) {
+        if (
+          /-32001|session.*not found/i.test(String(error)) ||
+          (isLayerError(error) && (error.code === 'FRAME_DETACHED' || error.code === 'DEBUGGER_DETACHED')) ||
+          s !== undefined
+        ) {
           return;
         }
         throw error;
