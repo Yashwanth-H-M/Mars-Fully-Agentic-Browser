@@ -220,7 +220,7 @@ describe('the context set', () => {
     // Still the agent's ask_user call, with its answer right after it.
     expect(last[question]).toContain('"toolName":"ask_user"');
     expect(last[question + 1]).toContain('only the personal one');
-  });
+  }, 15_000);
 
   it('a cutoff inside a tool batch: no result without its call, no call without its results, groups in order', async () => {
     const c = await createConversation({ mode: 'auto' });

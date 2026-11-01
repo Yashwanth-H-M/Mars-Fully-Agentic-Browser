@@ -42,19 +42,22 @@ function findOptionLabel(doc: LayoutDocument, node: LayoutNode): string | undefi
   // 1. Direct <label> wrapper or label[for]
   const labels = labelsOf(doc, node);
   for (const l of labels) {
-    const t = (doc.digest(l.index, 250) || doc.text(l.index, 250)).trim();
+    const t = (doc.text(l.index, 350) || doc.digest(l.index, 350)).trim();
     if (t) return t;
   }
   // 2. aria-label or title
   if (node.attrs['aria-label']?.trim()) return node.attrs['aria-label'].trim();
   if (node.attrs.title?.trim()) return node.attrs.title.trim();
-  // 3. Walk up ancestor tree (up to 4 levels) to find the enclosing option item container
+  // 3. Direct text of the node itself
+  const direct = (doc.text(node.index, 350) || doc.digest(node.index, 350)).trim();
+  if (direct.length > 0 && direct.length < 350) return direct;
+  // 4. Walk up ancestor tree (up to 4 levels) to find the enclosing option item container
   let p = doc.byIndex[node.parent];
   let depth = 0;
   while (p && depth < 4) {
     if (p.tag === 'body' || p.tag === 'html') break;
-    const t = doc.digest(p.index, 250).trim();
-    if (t.length > 0 && t.length < 250) {
+    const t = (doc.text(p.index, 350) || doc.digest(p.index, 350)).trim();
+    if (t.length > 0 && t.length < 350) {
       return t;
     }
     p = doc.byIndex[p.parent];
@@ -205,7 +208,16 @@ export function enrichFrame(
       !node.bounds &&
       !byBackend.has(node.backendNodeId)
     ) {
-      const label = labelsOf(doc, node).find(isRendered);
+      let label = labelsOf(doc, node).find(isRendered);
+      if (!label) {
+        // Fall back to nearest rendered ancestor container (e.g. div, li, span)
+        for (let p = doc.byIndex[node.parent]; p && p.tag !== 'body' && p.tag !== 'html'; p = doc.byIndex[p.parent]) {
+          if (isRendered(p) && (doc.text(p.index) || doc.digest(p.index))) {
+            label = p;
+            break;
+          }
+        }
+      }
       if (!label) continue;
       const name = findOptionLabel(doc, node) || doc.text(label.index);
       const created: ONode = {
@@ -251,10 +263,20 @@ export function enrichFrame(
       existing.name = 'Code Editor';
     }
 
+    const isOptionCard =
+      /(option|choice|answer|radio|checkbox)/i.test(cls) ||
+      'aria-checked' in node.attrs ||
+      'aria-selected' in node.attrs ||
+      node.attrs.role === 'option' ||
+      node.attrs.role === 'radio';
+
     if (existing?.actionable) {
       if (!existing.name) {
         const candidate = findActionableNameOrTooltip(doc, node);
         if (candidate) existing.name = candidate;
+      }
+      if (isOptionCard && existing.role === 'clickable') {
+        existing.role = 'radio';
       }
       continue;
     }
@@ -262,7 +284,7 @@ export function enrichFrame(
     const parent = doc.byIndex[node.parent];
     const signal = layoutSignal(node, parent);
     if (!signal) continue;
-    if (insideActionable(node) && !isNativeControl(node) && !existing?.name && !isEditor) continue;
+    if (insideActionable(node) && !isNativeControl(node) && !existing?.name && !isEditor && !isOptionCard) continue;
 
     // Prune out large layout containers (divs, sections, headers, banners) that are not atomic controls
     const isContainerTag = [
@@ -281,15 +303,15 @@ export function enrichFrame(
     const hasAriaInteractive = ['button', 'link', 'radio', 'checkbox', 'tab', 'menuitem'].includes(
       node.attrs.role ?? '',
     );
-    if (isContainerTag && !hasAriaInteractive && !node.scrollable && !isEditor) {
+    if (isContainerTag && !hasAriaInteractive && !node.scrollable && !isEditor && !isOptionCard) {
       const textLen = (doc.text(node.index) || '').length;
-      if (textLen > 35) continue;
+      if (textLen > 350) continue;
     }
 
     const digest = doc.digest(node.index);
     const name = isEditor
       ? 'Code Editor'
-      : isRadioOrCheck && findOptionLabel(doc, node)
+      : (isRadioOrCheck || isOptionCard) && findOptionLabel(doc, node)
         ? findOptionLabel(doc, node)!
         : holdsValue(node)
           ? node.attrs['aria-label'] ||
@@ -307,14 +329,15 @@ export function enrichFrame(
       existing.layout = { tag: node.tag, digest, names: nameSources(doc, node) };
       existing.name = isEditor ? 'Code Editor' : existing.name || name;
       if (isEditor) existing.role = 'textbox';
+      else if (isRadioOrCheck || isOptionCard) existing.role = 'radio';
     } else {
       splice(node, {
         kind: 'element',
         rawRole: `layout:${node.tag}`,
         role: isEditor
           ? 'textbox'
-          : isRadioOrCheck
-            ? node.attrs.type || node.attrs.role || 'radio'
+          : isRadioOrCheck || isOptionCard
+            ? 'radio'
             : layoutRole(node, signal),
         name,
         states: [],
